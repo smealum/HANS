@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include "common.h"
 #include "darm.h"
@@ -215,17 +216,138 @@ u8* loadSmdh()
 	return fileBuffer;
 }
 
+char* regions[] = {"JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN", "---"};
+char* languages[] = {"JP", "EN", "FR", "DE", "IT", "ES", "ZH", "KO", "NL", "PT", "RU", "TW", "--"};
+char* yesno[] = {"YES", "NO"};
+
+u64 getGamecardTid()
+{
+	amInit();
+
+	u64 tid = 0;
+	AM_GetTitleIdList(2, 1, &tid);
+
+	amExit();
+
+	return tid;
+}
+
+Result configureTitle(u8* region_code, u8* language_code)
+{
+	u64 tid = getGamecardTid();
+
+	if(!tid)return -1;
+
+	static char fn[256];
+	sprintf(fn, "titles/%08X%08X.txt", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+
+	mkdir("titles", 777);
+
+	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(yesno) / sizeof(yesno[0]), 0};
+	int num_fields = 4;
+	int choice[] = {0xFF, 0xFF, 1, 0};
+
+	hidScanInput();
+
+	{
+		FILE* f = fopen(fn, "r");
+		if(f)
+		{
+			static char l[256];
+			while(fgets(l, sizeof(l), f))
+			{
+				if(sscanf(l, "region : %d", &choice[0]) != 1)
+				if(sscanf(l, "language : %d", &choice[1]) != 1);
+			}
+
+			if(region_code)*region_code = choice[0];
+			if(language_code)*language_code = choice[1];
+			choice[2] = 0;
+
+			fclose(f);
+
+			if(!(hidKeysHeld() & KEY_L))return 0;
+		}else{
+			u8* smdh_data = loadSmdh();
+			if(smdh_data)
+			{
+				choice[0] = smdhGetRegionCode(smdh_data);
+				free(smdh_data);
+			}
+		}
+	}
+
+	consoleClear();
+
+	int field = 0;
+	while(1)
+	{
+		hidScanInput();
+
+		u32 kDown = hidKeysDown();
+
+		if((kDown & KEY_START) || ((kDown & KEY_A) && field == num_fields - 1))break;
+
+		if(kDown & KEY_UP)field--;
+		if(kDown & KEY_DOWN)field++;
+
+		if(field < 0)field = 0;
+		if(field >= num_fields)field = num_fields - 1;
+
+		if(kDown & KEY_LEFT)choice[field]--;
+		if(kDown & KEY_RIGHT)choice[field]++;
+
+		if(choice[field] < 0) choice[field] = numChoices[field] - 1;
+		if(choice[field] >= numChoices[field]) choice[field] = 0;
+
+		printf("\x1b[0;0H\n");
+		printf(             "               r5             \n");
+		printf("\n");
+		printf(field == 0 ? "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[0]]);
+		printf(field == 1 ? "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[1]]);
+		printf(field == 2 ? "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[2]]);
+		printf("\n");
+		printf(             "  Current title      : %08X%08X\n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+		printf("\n");
+		printf(field == 3 ? "             > OK\n" : "               OK\n");
+
+		gfxFlushBuffers();
+		gfxSwapBuffers();
+
+		gspWaitForVBlank();
+	}
+
+	if(choice[0] >= numChoices[0] - 1)choice[0] = -1;
+	if(choice[1] >= numChoices[1] - 1)choice[1] = -1;
+
+	if(choice[2] == 0)
+	{
+		FILE* f = fopen(fn, "w");
+		if(f)
+		{
+			fprintf(f, "region : %d\nlanguage : %d\n", choice[0], choice[1]);
+
+			fclose(f);
+		}
+	}
+
+	if(region_code)*region_code = choice[0];
+	if(language_code)*language_code = choice[1];
+
+	return 0;
+}
+
 void doRegionFive(u8* code_data, u32 code_size)
 {
-	u8* smdh_data = loadSmdh();
-	if(!smdh_data)return;
-
-    u8 region_code = smdhGetRegionCode(smdh_data);
+    u8 region_code = 2;
     u8 language_code = 2;
+
+    configureTitle(&region_code, &language_code);
 
     printf("region %X\n", region_code);
     printf("language %X\n", language_code);
 
+    if(region_code != 0xFF)
     {
 	    function_s cfgSecureInfoGetRegion = findCfgSecureInfoGetRegion(code_data, code_size);
 
@@ -234,6 +356,7 @@ void doRegionFive(u8* code_data, u32 code_size)
 	    patchCfgSecureInfoGetRegion(code_data, code_size, cfgSecureInfoGetRegion, region_code);
     }
 
+    if(language_code != 0xFF)
 	{
 	    function_s cfgCtrGetLanguage = findCfgCtrGetLanguage(code_data, code_size);
 	    
@@ -241,6 +364,4 @@ void doRegionFive(u8* code_data, u32 code_size)
 
 	    patchCfgCtrGetLanguage(code_data, code_size, cfgCtrGetLanguage, language_code);
 	}
-
-	free(smdh_data);
 }
