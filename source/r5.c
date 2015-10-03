@@ -12,6 +12,9 @@
 // for
 // regioooooonFIIIIIIIIIIVE
 
+Result getTitleInformation(u8* mediatype, u64* tid);
+Result gspwn(void* dst, void* src, u32 size);
+
 typedef struct
 {
     u32 start, end;
@@ -169,6 +172,40 @@ void patchCfgCtrGetLanguage(u8* code_data, u32 code_size, function_s c, u8 langu
     }
 }
 
+void setClockrate(u8 setting)
+{
+	int j, i;
+	u32* patchArea = linearAlloc(0x00100000);
+
+	// grab waitLoop stub
+	GSPGPU_FlushDataCache(NULL, (u8*)patchArea, 0x100);
+	gspwn(patchArea, (u32*)(MENU_LOADEDROP_BUFADR-0x100), 0x100);
+	svcSleepThread(20*1000*1000);
+
+	// patch it
+	for(i=0; i<0x100/4; i++)
+	{
+		if(patchArea[i] == 0x67666E63) // "cnfg"
+		{
+			patchArea[i+1] = (patchArea[i+1] & ~0xFF) | setting;
+			break;
+		}
+	}
+
+	// copy it back
+	GSPGPU_FlushDataCache(NULL, (u8*)patchArea, 0x100);
+	gspwn((u32*)(MENU_LOADEDROP_BUFADR-0x100), patchArea, 0x100);
+	svcSleepThread(20*1000*1000);
+
+	// ghetto dcache invalidation
+	// don't judge me
+	for(j=0; j<4; j++)
+		for(i=0; i<0x00100000/0x4; i+=0x4)
+			patchArea[i+j]^=0xDEADBABE;
+
+	linearFree(patchArea);
+}
+
 u8 smdhGetRegionCode(u8* smdh_data)
 {
     if(!smdh_data)return 0xFF;
@@ -180,12 +217,12 @@ u8 smdhGetRegionCode(u8* smdh_data)
     return 0xFF;
 }
 
-u8* loadSmdh()
+u8* loadSmdh(u64 tid, u8 mediatype)
 {
 	Result ret;
 	Handle fileHandle;
 
-	static const u32 archivePath[] = {0x00000000, 0x00000000, 0x00000002, 0x00000000};
+	u32 archivePath[] = {tid & 0xFFFFFFFF, (tid >> 32) & 0xFFFFFFFF, mediatype, 0x00000000};
 	static const u32 filePath[] = {0x00000000, 0x00000000, 0x00000002, 0x6E6F6369, 0x00000000}; // icon
 
 	ret = FSUSER_OpenFileDirectly(NULL, &fileHandle, (FS_archive){0x2345678a, (FS_path){PATH_BINARY, 0x10, (u8*)archivePath}}, (FS_path){PATH_BINARY, 0x14, (u8*)filePath}, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
@@ -219,10 +256,18 @@ u8* loadSmdh()
 char* regions[] = {"JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN", "---"};
 char* languages[] = {"JP", "EN", "FR", "DE", "IT", "ES", "ZH", "KO", "NL", "PT", "RU", "TW", "--"};
 char* yesno[] = {"YES", "NO"};
+char* clocks[] = {"268Mhz", "804Mhz"};
 
-Result getTitleInformation(u8* mediatype, u64* tid);
+typedef enum
+{
+	CHOICE_REGION = 0,
+	CHOICE_LANGUAGE = 1,
+	CHOICE_CLOCK = 2,
+	CHOICE_SAVE = 3,
+	CHOICE_OK
+}choices_t;
 
-Result configureTitle(u8* region_code, u8* language_code)
+Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -236,9 +281,9 @@ Result configureTitle(u8* region_code, u8* language_code)
 
 	mkdir("titles", 777);
 
-	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(yesno) / sizeof(yesno[0]), 0};
-	int num_fields = 4;
-	int choice[] = {numChoices[0]-1, numChoices[1]-1, 1, 0};
+	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), 0};
+	int num_fields = 5;
+	int choice[] = {numChoices[0]-1, numChoices[1]-1, 0, 1, 0};
 
 	hidScanInput();
 
@@ -249,22 +294,24 @@ Result configureTitle(u8* region_code, u8* language_code)
 			static char l[256];
 			while(fgets(l, sizeof(l), f))
 			{
-				if(sscanf(l, "region : %d", &choice[0]) != 1)
-				if(sscanf(l, "language : %d", &choice[1]) != 1);
+				if(sscanf(l, "region : %d", &choice[CHOICE_REGION]) != 1)
+				if(sscanf(l, "language : %d", &choice[CHOICE_LANGUAGE]) != 1);
+				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
 			}
 
-			if(region_code)*region_code = choice[0];
-			if(language_code)*language_code = choice[1];
-			choice[2] = 0;
+			if(region_code)*region_code = choice[CHOICE_REGION];
+			if(language_code)*language_code = choice[CHOICE_LANGUAGE];
+			if(clock)*clock = choice[CHOICE_CLOCK];
+			choice[CHOICE_SAVE] = 0;
 
 			fclose(f);
 
 			if(!(hidKeysHeld() & KEY_L))return 0;
 		}else{
-			u8* smdh_data = loadSmdh();
+			u8* smdh_data = loadSmdh(tid, mediatype);
 			if(smdh_data)
 			{
-				choice[0] = smdhGetRegionCode(smdh_data);
+				choice[CHOICE_REGION] = smdhGetRegionCode(smdh_data);
 				free(smdh_data);
 			}
 		}
@@ -296,13 +343,14 @@ Result configureTitle(u8* region_code, u8* language_code)
 		printf("\x1b[0;0H\n");
 		printf(             "               r5             \n");
 		printf("\n");
-		printf(field == 0 ? "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[0]]);
-		printf(field == 1 ? "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[1]]);
-		printf(field == 2 ? "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[2]]);
+		printf(field == CHOICE_REGION ?   "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[CHOICE_REGION]]);
+		printf(field == CHOICE_LANGUAGE ? "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[CHOICE_LANGUAGE]]);
+		printf(field == CHOICE_CLOCK ?    "  N3DS CPU clock     : < %s > \n" : "  N3DS CPU clock     :   %s   \n", clocks[choice[CHOICE_CLOCK]]);
+		printf(field == CHOICE_SAVE ?     "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[CHOICE_SAVE]]);
 		printf("\n");
 		printf(             "  Current title      : %08X%08X\n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 		printf("\n");
-		printf(field == 3 ? "             > OK\n" : "               OK\n");
+		printf(field == CHOICE_OK ? "             > OK\n" : "               OK\n");
 
 		gfxFlushBuffers();
 		gfxSwapBuffers();
@@ -310,22 +358,23 @@ Result configureTitle(u8* region_code, u8* language_code)
 		gspWaitForVBlank();
 	}
 
-	if(choice[0] >= numChoices[0] - 1)choice[0] = -1;
-	if(choice[1] >= numChoices[1] - 1)choice[1] = -1;
+	if(choice[CHOICE_REGION] >= numChoices[CHOICE_REGION] - 1)choice[CHOICE_REGION] = -1;
+	if(choice[CHOICE_LANGUAGE] >= numChoices[CHOICE_LANGUAGE] - 1)choice[CHOICE_LANGUAGE] = -1;
 
-	if(choice[2] == 0)
+	if(choice[CHOICE_SAVE] == 0)
 	{
 		FILE* f = fopen(fn, "w");
 		if(f)
 		{
-			fprintf(f, "region : %d\nlanguage : %d\n", choice[0], choice[1]);
+			fprintf(f, "region : %d\nlanguage : %d\nclock : %d\n", choice[CHOICE_REGION], choice[CHOICE_LANGUAGE], choice[CHOICE_CLOCK]);
 
 			fclose(f);
 		}
 	}
 
-	if(region_code)*region_code = choice[0];
-	if(language_code)*language_code = choice[1];
+	if(region_code)*region_code = choice[CHOICE_REGION];
+	if(language_code)*language_code = choice[CHOICE_LANGUAGE];
+	if(clock)*clock = choice[CHOICE_CLOCK];
 
 	return 0;
 }
@@ -334,8 +383,9 @@ void doRegionFive(u8* code_data, u32 code_size)
 {
     u8 region_code = 2;
     u8 language_code = 2;
+    u8 clock = 0;
 
-    configureTitle(&region_code, &language_code);
+    configureTitle(&region_code, &language_code, &clock);
 
     printf("region %X\n", region_code);
     printf("language %X\n", language_code);
@@ -356,5 +406,10 @@ void doRegionFive(u8* code_data, u32 code_size)
 	    printf("cfgCtrGetLanguage : %08X - %08X\n", (unsigned int)(cfgCtrGetLanguage.start * 4 + 0x00100000), (unsigned int)(cfgCtrGetLanguage.end * 4 + 0x00100000));
 
 	    patchCfgCtrGetLanguage(code_data, code_size, cfgCtrGetLanguage, language_code);
+	}
+
+	if(clock != 0xFF)
+	{
+		setClockrate(clock);
 	}
 }
