@@ -44,12 +44,65 @@ void buildMap(memorymap_t* mm, u32 size)
 
 memorymap_t processMap;
 
+// bypass handle list
+Result _srvGetServiceHandle(Handle* out, const char* name)
+{
+	Result rc = 0;
+
+	u32* cmdbuf = getThreadCommandBuffer();
+	cmdbuf[0] = 0x50100;
+	strcpy((char*) &cmdbuf[1], name);
+	cmdbuf[3] = strlen(name);
+	cmdbuf[4] = 0x0;
+	
+	if((rc = svcSendSyncRequest(*srvGetSessionHandle())))return rc;
+
+	*out = cmdbuf[3];
+	return cmdbuf[1];
+}
+
+Result getTitleInformation(u8* mediatype, u64* tid)
+{
+	Result ret = 0;
+
+	if(mediatype)
+	{
+		Handle localFsHandle;
+
+		ret = _srvGetServiceHandle(&localFsHandle, "fs:USER");
+		if(ret)return ret;
+		
+		ret = FSUSER_Initialize(&localFsHandle);
+		if(ret)return ret;
+
+		ret = FSUSER_GetMediaType(&localFsHandle, mediatype);
+
+		svcCloseHandle(localFsHandle);
+	}
+
+	if(tid)
+	{
+		aptOpenSession();
+		ret = APT_GetProgramID(NULL, tid);
+		aptCloseSession();
+	}
+
+	return ret;
+}
+
 Result loadCode()
 {
 	Result ret;
 	Handle fileHandle;
 
-	static const u32 archivePath[] = {0x00000000, 0x00000000, 0x00000002, 0x00000000};
+	u8 mediatype = 0;
+	u64 tid = 0;
+
+	ret = getTitleInformation(&mediatype, &tid);
+
+	printf("%08X : %d, %08X, %08X\n", (unsigned int)ret, mediatype, (unsigned int)tid & 0xFFFFFFFF, (unsigned int)(tid >> 32) & 0xFFFFFFFF);
+
+	u32 archivePath[] = {tid & 0xFFFFFFFF, (tid >> 32) & 0xFFFFFFFF, mediatype, 0x00000000};
 	static const u32 filePath[] = {0x00000000, 0x00000000, 0x00000002, 0x646F632E, 0x00000065};
 
 	// ret = FSUSER_OpenFileDirectly(&localFsHandle, &fileHandle, (FS_archive){0x00000003, (FS_path){PATH_EMPTY, 1, (u8*)""}}, (FS_path){PATH_BINARY, 0x14, (u8*)filePath}, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
@@ -209,7 +262,7 @@ void runLoader()
 	printf("prepared to run loader");
 }
 
-void __attribute__((weak)) __attribute__((noreturn)) __libctru_exit(int rc)
+void __attribute__((noreturn)) __libctru_exit(int rc)
 {
 	u32 tmp=0;
 
@@ -227,6 +280,26 @@ void __attribute__((weak)) __attribute__((noreturn)) __libctru_exit(int rc)
 	svcExitProcess();
 }
 
+void __appInit() {
+	// Initialize services
+	srvInit();
+	// aptInit();
+	hidInit(NULL);
+
+	fsInit();
+	sdmcInit();
+}
+
+void __appExit() {
+	// Exit services
+	sdmcExit();
+	fsExit();
+
+	hidExit();
+	// aptExit();
+	srvExit();
+}
+
 int main(int argc, char **argv)
 {
 	gfxInitDefault();
@@ -234,6 +307,21 @@ int main(int argc, char **argv)
 	consoleInit(GFX_TOP, NULL);
 
 	printf("\x1b[15;19Hwhat is up\n");
+
+
+	// Result ret;
+	// u8 currentType;
+	// u32 requestedAppid, menuAppid, currentAppid;
+
+	// int i;
+	// for(i=0;i<5;i++)
+	// {
+	// 	aptOpenSession();
+	// 	ret=APT_GetAppletManInfo(NULL, i, &currentType, &requestedAppid, &menuAppid, &currentAppid);
+	// 	aptCloseSession();
+	// 	printf("%d (%x) : %x %x %x %x\n", i, ret, currentType, requestedAppid, menuAppid, currentAppid);
+	// }
+
 
 	paramblk = linearAlloc(sizeof(paramblk_t));
 
@@ -261,13 +349,13 @@ int main(int argc, char **argv)
 
 	// 	u32 kDown = hidKeysDown();
 
-	// 	if (kDown & KEY_X) freeHomeMenuResources();
-	// 	if (kDown & KEY_A) crashHomeMenu();
-	// 	if (kDown & KEY_B) crashApp();
-	// 	if (kDown & KEY_Y) loadCode();
-	// 	if (kDown & KEY_L) patchCode();
-	// 	if (kDown & KEY_SELECT) runLoader();
-	// 	if (kDown & KEY_DOWN) retMenu();
+	// 	// if (kDown & KEY_X) freeHomeMenuResources();
+	// 	// if (kDown & KEY_A) crashHomeMenu();
+	// 	// if (kDown & KEY_B) crashApp();
+	// 	// if (kDown & KEY_Y) loadCode();
+	// 	// if (kDown & KEY_L) patchCode();
+	// 	// if (kDown & KEY_SELECT) runLoader();
+	// 	// if (kDown & KEY_DOWN) retMenu();
 	// 	if (kDown & KEY_START) break;
 
 	// 	gfxFlushBuffers();

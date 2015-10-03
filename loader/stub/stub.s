@@ -95,6 +95,13 @@
 		cmp r4, #0x26
 		bne handleCloseLoop
 
+	; loop:
+	; ; sleep for a bit
+	; mov r0, #0x05000000 ; ~100ms
+	; mov r1, #0x00000000
+	; .word 0xef00000a
+	; b loop
+
 	mov sp, #0x10000000
 	mov pc, #0x00100000
 

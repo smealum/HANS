@@ -300,8 +300,8 @@ void runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
 	Handle local_gspSharedMemHandle = gspSharedMemHandle;
 	void (*local_stub)(Handle gsp, Handle nss, Handle gspMem) = stub;
 
-	// crash home menu
-	crashHomeMenu();
+	// // crash home menu
+	// crashHomeMenu();
 
 	// free GSP heap
 	svc_controlMemory(&tmp, (u32)gspHeap, 0x0, gspHeap_size, MEMOP_FREE, 0x0);

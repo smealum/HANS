@@ -220,21 +220,14 @@ char* regions[] = {"JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN", "---"};
 char* languages[] = {"JP", "EN", "FR", "DE", "IT", "ES", "ZH", "KO", "NL", "PT", "RU", "TW", "--"};
 char* yesno[] = {"YES", "NO"};
 
-u64 getGamecardTid()
-{
-	amInit();
-
-	u64 tid = 0;
-	AM_GetTitleIdList(2, 1, &tid);
-
-	amExit();
-
-	return tid;
-}
+Result getTitleInformation(u8* mediatype, u64* tid);
 
 Result configureTitle(u8* region_code, u8* language_code)
 {
-	u64 tid = getGamecardTid();
+	u8 mediatype = 0;
+	u64 tid = 0;
+
+	getTitleInformation(&mediatype, &tid);
 
 	if(!tid)return -1;
 
@@ -245,7 +238,7 @@ Result configureTitle(u8* region_code, u8* language_code)
 
 	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(yesno) / sizeof(yesno[0]), 0};
 	int num_fields = 4;
-	int choice[] = {0xFF, 0xFF, 1, 0};
+	int choice[] = {numChoices[0]-1, numChoices[1]-1, 1, 0};
 
 	hidScanInput();
 
