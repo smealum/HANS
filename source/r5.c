@@ -15,44 +15,6 @@
 Result getTitleInformation(u8* mediatype, u64* tid);
 Result gspwn(void* dst, void* src, u32 size);
 
-typedef struct
-{
-    u32 start, end;
-}function_s;
-
-function_s findFunction(u32* code_data32, u32 code_size32, u32 start)
-{
-    if(!code_data32 || !code_size32)return (function_s){0,0};
-
-    // super crappy but should work most of the time
-    // (we're only searching for small uncomplicated functions)
-
-    function_s c = {start, start};
-    int j;
-
-    for(j=start; j<code_size32; j++)
-    {
-        darm_t d;
-        if(!darm_armv7_disasm(&d, code_data32[j]) && ((d.instr == I_POP && d.Rn == SP) || (d.instr == I_BX && d.Rm == LR)))
-        {
-            c.end = j;
-            break;
-        }
-    }
-
-    for(j=start; j>0; j--)
-    {
-        darm_t d;
-        if(!darm_armv7_disasm(&d, code_data32[j]) && (d.instr == I_PUSH && d.Rn == SP))
-        {
-            c.start = j;
-            break;
-        }
-    }
-
-    return c;
-}
-
 function_s findCfgSecureInfoGetRegion(u8* code_data, u32 code_size)
 {
     if(!code_data || !code_size)return (function_s){0,0};
@@ -412,4 +374,9 @@ void doRegionFive(u8* code_data, u32 code_size)
 	{
 		setClockrate(clock);
 	}
+
+	// TEMP
+	Handle fsHandle;
+	srvGetServiceHandle(&fsHandle, "fs:USER");
+	patchRedirectFs(code_data, code_size, fsHandle);
 }

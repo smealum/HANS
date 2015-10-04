@@ -79,21 +79,21 @@
 	;cmp r0, #0
 	;ldrne r0, [r0]
 
-	; close all the handles
-	mov r4, #0
-	handleCloseLoop:
-		mov r5, #0
-		handleCloseLoop2:
-			mov r0, r5, lsl 15
-			orr r0, r4
-			.word 0xef000023
-			cmp r0, #0
-			addne r5, #1
-			cmpne r5, #0x200
-			bne handleCloseLoop2
-		add r4, #1
-		cmp r4, #0x26
-		bne handleCloseLoop
+	; ; close all the handles
+	; mov r4, #0
+	; handleCloseLoop:
+	; 	mov r5, #0
+	; 	handleCloseLoop2:
+	; 		mov r0, r5, lsl 15
+	; 		orr r0, r4
+	; 		.word 0xef000023
+	; 		cmp r0, #0
+	; 		addne r5, #1
+	; 		cmpne r5, #0x200
+	; 		bne handleCloseLoop2
+	; 	add r4, #1
+	; 	cmp r4, #0x26
+	; 	bne handleCloseLoop
 
 	; loop:
 	; ; sleep for a bit
