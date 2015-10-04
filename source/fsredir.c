@@ -8,6 +8,8 @@
 #include "darm.h"
 #include "fsredir.h"
 
+#include "path_insert_stub_stub.h"
+
 function_s findFsInitialize(u8* code_data, u32 code_size)
 {
     return findPooledCommandFunction(code_data, code_size, 0x08010002);
@@ -250,6 +252,27 @@ void patchFsControlArchive(u8* code_data, u32 code_size, function_s c)
     code_data32[c.start + 1] = 0xE12FFF1E; // bx lr
 }
 
+void patchPathDirectoryInsert(u8* code_data, u32 code_size, function_s fsTryOpenFile, function_s fsOpenRom)
+{
+    if(!code_data || !code_size || fsTryOpenFile.start == fsTryOpenFile.end || fsTryOpenFile.end == 0)return;
+    if(fsOpenRom.start == fsOpenRom.end || fsOpenRom.end == 0)return;
+
+    u32* code_data32 = (u32*)code_data;
+    u32 code_size32 = code_size / 4;
+
+    memcpy(&code_data32[fsOpenRom.start], path_insert_stub_stub, path_insert_stub_stub_size);
+
+    u32 push_instr = code_data32[fsTryOpenFile.start];
+    u32 jump_address = (fsTryOpenFile.start + 1) * 4 + 0x00100000;
+    u32 stub_size32 = path_insert_stub_stub_size >> 2;
+    u32 thunk = fsOpenRom.start + stub_size32 - 6;
+
+    code_data32[thunk + 5] = jump_address;
+    code_data32[thunk + 2] = push_instr;
+    
+    code_data32[fsTryOpenFile.start] = 0xEA000000 | ((thunk - fsTryOpenFile.start - 2) & 0x00FFFFFF); // b fsTryOpenFile+4
+}
+
 void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle)
 {
     function_s fsHighLevelInitialize = findFsHighLevelInitialize(code_data, code_size);
@@ -269,9 +292,12 @@ void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle)
     
     function_s fsControlArchive = findFsControlArchive(code_data, code_size);
     printf("fsControlArchive : %08X - %08X\n", (unsigned int)(fsControlArchive.start * 4 + 0x00100000), (unsigned int)(fsControlArchive.end * 4 + 0x00100000));
+    
+    function_s fsTryOpenFile = (function_s){0x145A4, 0x145C7}; // TEMP
 
     patchFsHighLevelInitialize(code_data, code_size, fsHighLevelInitialize, fsHandle);
     patchFsMountSave(code_data, code_size, fsMountSave);
     patchFsMountRom(code_data, code_size, fsOpenSpecialArchiveRaw, fsOpenRom, fsMountRom);
     patchFsControlArchive(code_data, code_size, fsControlArchive);
+    patchPathDirectoryInsert(code_data, code_size, fsTryOpenFile, fsOpenRom);
 }

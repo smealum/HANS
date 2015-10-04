@@ -7,7 +7,6 @@
 #include "common.h"
 #include "r5.h"
 #include "loader_bin.h"
-#include "app_code_bin.h"
 
 paramblk_t* paramblk = NULL;
 

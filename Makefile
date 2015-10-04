@@ -29,7 +29,7 @@ include $(DEVKITARM)/3ds_rules
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source
-DATA		:=	data
+DATA		:=	data stubs
 INCLUDES	:=	include
 
 #---------------------------------------------------------------------------------
@@ -167,6 +167,18 @@ $(OUTPUT).elf	:	$(OFILES)
 	@echo "extern const u8" `(echo $(notdir $<).shbin | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`"[];" >> `(echo $(notdir $<).shbin | tr . _)`.h
 	@echo "extern const u32" `(echo $(notdir $<).shbin | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`_size";" >> `(echo $(notdir $<).shbin | tr . _)`.h
 	@rm ../$(notdir $<).shbin
+
+# WARNING: This is not the right way to do this! TODO: Do it right!
+#---------------------------------------------------------------------------------
+%.stub.o :	%.stub
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@cd ../stubs && armips $*.stub && mv $*.bin ../$(notdir $<).stub
+	@bin2s ../$(notdir $<).stub | $(PREFIX)as -o $@
+	@echo "extern const u8" `(echo $(notdir $<).stub | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`"_end[];" > `(echo $(notdir $<).stub | tr . _)`.h
+	@echo "extern const u8" `(echo $(notdir $<).stub | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`"[];" >> `(echo $(notdir $<).stub | tr . _)`.h
+	@echo "extern const u32" `(echo $(notdir $<).stub | sed -e 's/^\([0-9]\)/_\1/' | tr . _)`_size";" >> `(echo $(notdir $<).stub | tr . _)`.h
+	@rm ../$(notdir $<).stub
 
 -include $(DEPENDS)
 
