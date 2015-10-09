@@ -264,15 +264,11 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs)
 				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
 				if(sscanf(l, "romfs : %d", &choice[CHOICE_ROMFS]) != 1);
 			}
-
-			if(region_code)*region_code = choice[CHOICE_REGION];
-			if(language_code)*language_code = choice[CHOICE_LANGUAGE];
-			if(clock)*clock = choice[CHOICE_CLOCK];
 			choice[CHOICE_SAVE] = 0;
 
 			fclose(f);
 
-			if(!(hidKeysHeld() & KEY_L))return 0;
+			if(!(hidKeysHeld() & KEY_L))goto end;
 		}else{
 			u8* smdh_data = loadSmdh(tid, mediatype);
 			if(smdh_data)
@@ -345,6 +341,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs)
 		}
 	}
 
+	end:
 	if(region_code)*region_code = choice[CHOICE_REGION];
 	if(language_code)*language_code = choice[CHOICE_LANGUAGE];
 	if(clock)*clock = choice[CHOICE_CLOCK];
