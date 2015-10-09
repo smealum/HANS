@@ -42,7 +42,7 @@ function_s findFunction(u32* code_data32, u32 code_size32, u32 start)
     return c;
 }
 
-function_s findPooledCommandFunction(u8* code_data, u32 code_size, u32 pooled_value)
+function_s findPooledCommandFunction(u8* code_data, u32 code_size, u32 pooled_value, validationCallback_t callback)
 {
     if(!code_data || !code_size)return (function_s){0,0};
 
@@ -56,13 +56,15 @@ function_s findPooledCommandFunction(u8* code_data, u32 code_size, u32 pooled_va
         {
             function_s c = findFunction(code_data32, code_size32, i-4);
 
-            bool found = false;
             for(j=c.start; j<=c.end; j++)
             {
                 darm_t d;
                 if(!darm_armv7_disasm(&d, code_data32[j]) && (d.instr == I_LDR && d.Rn == PC && (i-j-2)*4 == d.imm))
                 {
-                    return c;
+                    if(callback)
+                    {
+                        if(callback(code_data32, code_size32, c, i))return c;
+                    }else return c;
                 }
             }
         }

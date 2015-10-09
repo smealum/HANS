@@ -389,13 +389,11 @@ void doRegionFive(u8* code_data, u32 code_size)
 	// }
 
 	{
-		// Handle fileHandle;
-		// FS_archive sdmcArchive=(FS_archive){ARCH_SDMC, (FS_path){PATH_EMPTY, 1, (u8*)""}};
-		// FS_path filePath=FS_makePath(PATH_CHAR, "/mm.romfs");
+		char path[32];
+		u64 tid = 0;
+		getTitleInformation(NULL, &tid);
+		sprintf(path, "/hans/%08X.romfs", (unsigned int)(tid&0xFFFFFFFF));
 
-		// FSUSER_OpenFileDirectly(NULL, &fileHandle, sdmcArchive, filePath, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
-
-		// patchFsOpenRom(code_data, code_size, fileHandle);
-		patchFsOpenRom(code_data, code_size, fsHandle);
+		patchFsOpenRom(code_data, code_size, fsHandle, path);
 	}
 }

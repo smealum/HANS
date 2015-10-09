@@ -31,7 +31,7 @@ openfiledirectly:
 	add r0, pc, path-.-8
 	str r0, [r4, #path_ptr-cmd_buf]
 
-	mov r0, #path_end-path
+	ldr r0, [pc, #path_length-.-8]
 	str r0, [r4, #path_size-cmd_buf]
 
 	mov r0, r0, lsl 14
@@ -69,11 +69,15 @@ cmd_buf:
 	.word 0x0 ; (u32)fileLowPath.data;
 cmd_buf_end:
 
+.align 0x4
 path:
-	; .ascii "/mm.romfs"
-	.ascii "/sango.romfs"
+	.ascii "/hans/deadbabe.romfs"
 	.byte 0x00
 path_end:
+
+.align 0x4
+path_length:
+	.word 0xdeaddad0
 
 .align 0x4
 fs_handle:

@@ -14,27 +14,27 @@
 
 function_s findFsInitialize(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x08010002);
+    return findPooledCommandFunction(code_data, code_size, 0x08010002, NULL);
 }
 
 function_s findFsInitializeWithSdkVersion(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x08610042);
+    return findPooledCommandFunction(code_data, code_size, 0x08610042, NULL);
 }
 
 function_s findFsOpenArchive(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x080C00C2);
+    return findPooledCommandFunction(code_data, code_size, 0x080C00C2, NULL);
 }
 
 function_s findFsOpenFileDirectly(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x08030204);
+    return findPooledCommandFunction(code_data, code_size, 0x08030204, NULL);
 }
 
 function_s findFsControlArchive(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x80D0144);
+    return findPooledCommandFunction(code_data, code_size, 0x80D0144, NULL);
 }
 
 function_s findFsHighLevelInitialize(u8* code_data, u32 code_size)
@@ -291,6 +291,86 @@ bool findFsFindArchiveCallersCallback(u32* code_data32, u32 code_size32, functio
     return false;
 }
 
+function_s findSvcConnectToPort(u8* code_data, u32 code_size)
+{
+    if(!code_data || !code_size)return (function_s){0,0};
+
+    u32* code_data32 = (u32*)code_data;
+    u32 code_size32 = code_size / 4;
+    int i;
+
+    for(i=0; i<code_size32; i++)
+    {
+        if(code_data32[i] == 0xEF00002D)
+        {
+            return (function_s){i-1,i+4};
+        }
+    }
+
+    return (function_s){0,0};
+}
+
+bool findFatalerrCallback(u32* code_data32, u32 code_size32, function_s candidate, u32 ref)
+{
+    int j;
+
+    for(j=candidate.start; j<candidate.end; j++)
+    {
+        darm_t d;
+        if(!darm_armv7_disasm(&d, code_data32[j]) && (d.instr == I_LDR && d.Rn == PC && code_data32[j+d.imm/4+2] == 0xD0401834))
+        {
+            return true;
+        }
+        if(!darm_armv7_disasm(&d, code_data32[j]) && (d.instr == I_AND && d.imm == 0x7E00000))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function_s findFatalerr(u8* code_data, u32 code_size)
+{
+    if(!code_data || !code_size)return (function_s){0,0};
+
+    function_s svcConnectToPort = findSvcConnectToPort(code_data, code_size);
+
+    return findFunctionReferenceFunction(code_data, code_size, svcConnectToPort, findFatalerrCallback, NULL);
+}
+
+bool findFsSetPriorityForFileCallback(u32* code_data32, u32 code_size32, function_s candidate, u32 ref)
+{
+    int j;
+
+    for(j=candidate.end; j>candidate.start; j--)
+    {
+        darm_t d;
+        if(!darm_armv7_disasm(&d, code_data32[j]) && (d.instr == I_BX))
+        {
+            int reg = d.Rn;
+            if(!darm_armv7_disasm(&d, code_data32[j-1]) && (d.instr == I_LDR && d.Rd == reg && d.imm == 0x18))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function_s findFsSetPriorityForFile(u8* code_data, u32 code_size)
+{
+    if(!code_data || !code_size)return (function_s){0,0};
+
+    function_s ret = findPooledCommandFunction(code_data, code_size, 0xE0E046BC, findFsSetPriorityForFileCallback);
+    if(ret.start == ret.end)return ret;
+
+    ret.start = ret.end - 6;
+
+    return ret;
+}
+
 void patchPathDirectoryInsert(u8* code_data, u32 code_size, function_s fsFindArchive, function_s fsOpenRom, char* directory)
 {
     if(!code_data || !code_size || !directory || fsFindArchive.start == fsFindArchive.end || fsFindArchive.end == 0)return;
@@ -375,7 +455,7 @@ void patchPathDirectoryInsertFindArchive(u8* code_data, u32 code_size, function_
     code_data32[fsFindArchive.start] = 0xEA000000 | ((thunk - fsFindArchive.start - 2) & 0x00FFFFFF); // b origin+4
 }
 
-void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle)
+void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle, char* path)
 {
     if(!code_data || !code_size)return;
     function_s fsOpenFileDirectly = findFsOpenFileDirectly(code_data, code_size);
@@ -384,8 +464,7 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle)
     u32* code_data32 = (u32*)code_data;
     u32 code_size32 = code_size / 4;
 
-    // function_s fatalErr = (function_s){0x8709, 0x874B};
-    function_s fatalErr = (function_s){0x6342, 0x6383};
+    function_s fatalErr = findFatalerr(code_data, code_size);
 
     u32 stub_offset = fatalErr.start + 1;
     u32 stub_size32 = openfiledirectly_stub_stub_size / 4;
@@ -395,43 +474,29 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle)
     code_data32[stub_offset + stub_size32 - 2] = fsHandle;
     code_data32[stub_offset + stub_size32 - 1] = 0x00100000 + (fsOpenFileDirectly.start + 1) * 4;
 
+    int i;
+    for(i=fatalErr.start+1; i<fatalErr.end; i++)
+    {
+        if(code_data32[i] == 0x6E61682f) // "/han"
+        {
+            strncpy((char*)&code_data32[i], path, 21);
+        }else if(code_data32[i] == 0xdeaddad0)
+        {
+            code_data32[i] = strlen(path) + 1;
+            break;
+        }
+    }
+
     code_data32[fatalErr.start] = 0xffffffff;
     code_data32[fsOpenFileDirectly.start] = 0xEA000000 | ((fatalErr.start + 1 - fsOpenFileDirectly.start - 2) & 0x00FFFFFF); // branch
 
-    // function_s fsFileSetPriority = findPooledCommandFunction(code_data, code_size, 0x080A0040);
-    // if(fsFileSetPriority.start != fsFileSetPriority.end)
-    // {
-    //     code_data32[fsFileSetPriority.start + 0] = 0xE3A00000; // mov r0, #0
-    //     code_data32[fsFileSetPriority.start + 1] = 0xE12FFF1E; // bx lr
-    // }
+    function_s fsSetPriorityForFile = findFsSetPriorityForFile(code_data, code_size);
 
-    // code_data32[0x13196B + 0] = 0xE3A00000; // mov r0, #0
-    // code_data32[0x13196B + 1] = 0xE12FFF1E; // bx lr
-    code_data32[0x3D7AE + 0] = 0xE3A00000; // mov r0, #0
-    code_data32[0x3D7AE + 1] = 0xE12FFF1E; // bx lr
-
-    // code_data32[fsOpenFileDirectlyReference] = 0xE5810000; // str r0, [r1]
-    // code_data32[fsOpenFileDirectlyReference + 1] = 0xE3A00000; // mov r0, #0
-    // // code_data32[fsOpenFileDirectlyReference + 1] = 0xffffffff; // break (TMP)
-
-    // // we need to conserve the instruction that sets up r1 so we find it first
-    // u32 setup_offset = fsOpenFileDirectlyReference - 4;
-    // u32 r1_instr = 0;
-    // int i;
-    // for(i = fsOpenFileDirectlyReference; i>fsOpenRom.start; i--)
-    // {
-    //     darm_t d;
-    //     if(!darm_armv7_disasm(&d, code_data32[i]) && (d.Rd == r1))
-    //     {
-    //         r1_instr = code_data32[i];
-    //         break;
-    //     }
-    // }
-
-    // code_data32[setup_offset] = 0xE59F0000; // ldr r0, =handle_value
-    // code_data32[setup_offset + 1] = 0xEA000000; // branch to skip handle value
-    // code_data32[setup_offset + 2] = romfsFileHandle; // handle value
-    // code_data32[setup_offset + 3] = r1_instr; // setup r1
+    if(fsSetPriorityForFile.start != fsSetPriorityForFile.end)
+    {
+        code_data32[fsSetPriorityForFile.start + 0] = 0xE3A00000; // mov r0, #0
+        code_data32[fsSetPriorityForFile.start + 1] = 0xE12FFF1E; // bx lr
+    }
 }
 
 void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle, char* directory)
