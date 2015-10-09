@@ -226,11 +226,14 @@ typedef enum
 	CHOICE_REGION = 0,
 	CHOICE_LANGUAGE = 1,
 	CHOICE_CLOCK = 2,
-	CHOICE_SAVE = 3,
-	CHOICE_OK
+	CHOICE_ROMFS = 3,
+	CHOICE_SAVE = 4,
+	CHOICE_OK = 5,
+	CHOICE_EXIT,
+	CHOICE_NUM
 }choices_t;
 
-Result configureTitle(u8* region_code, u8* language_code, u8* clock)
+Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -244,9 +247,8 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 
 	mkdir("titles", 777);
 
-	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), 0};
-	int num_fields = 5;
-	int choice[] = {numChoices[0]-1, numChoices[1]-1, 0, 1, 0};
+	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), 0, 0};
+	int choice[] = {numChoices[0]-1, numChoices[1]-1, 0, 1, 1, 0, 0};
 
 	hidScanInput();
 
@@ -260,6 +262,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 				if(sscanf(l, "region : %d", &choice[CHOICE_REGION]) != 1)
 				if(sscanf(l, "language : %d", &choice[CHOICE_LANGUAGE]) != 1);
 				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
+				if(sscanf(l, "romfs : %d", &choice[CHOICE_ROMFS]) != 1);
 			}
 
 			if(region_code)*region_code = choice[CHOICE_REGION];
@@ -289,13 +292,13 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 
 		u32 kDown = hidKeysDown();
 
-		if((kDown & KEY_START) || ((kDown & KEY_A) && field == num_fields - 1))break;
+		if((kDown & KEY_START) || ((kDown & KEY_A) && (field == CHOICE_OK || field == CHOICE_EXIT)))break;
 
 		if(kDown & KEY_UP)field--;
 		if(kDown & KEY_DOWN)field++;
 
 		if(field < 0)field = 0;
-		if(field >= num_fields)field = num_fields - 1;
+		if(field >= CHOICE_NUM)field = CHOICE_NUM - 1;
 
 		if(kDown & KEY_LEFT)choice[field]--;
 		if(kDown & KEY_RIGHT)choice[field]++;
@@ -309,17 +312,24 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 		printf(field == CHOICE_REGION ?   "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[CHOICE_REGION]]);
 		printf(field == CHOICE_LANGUAGE ? "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[CHOICE_LANGUAGE]]);
 		printf(field == CHOICE_CLOCK ?    "  N3DS CPU clock     : < %s > \n" : "  N3DS CPU clock     :   %s   \n", clocks[choice[CHOICE_CLOCK]]);
+		printf(field == CHOICE_ROMFS ?    "  Romfs -> SD        : < %s > \n" : "  Romfs -> SD        :   %s   \n", yesno[choice[CHOICE_ROMFS]]);
 		printf(field == CHOICE_SAVE ?     "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[CHOICE_SAVE]]);
-		printf("\n");
-		printf(             "  Current title      : %08X%08X\n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
-		printf("\n");
-		printf(field == CHOICE_OK ? "             > OK\n" : "               OK\n");
+		printf(                           "                                               \n");
+		printf(                           "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+		if(!choice[CHOICE_ROMFS])
+			printf(                       "  Romfs path         : sd:/hans/%08X.romfs\n", (unsigned int)(tid & 0xFFFFFFFF));
+		printf(                           "                                               \n");
+		printf(field == CHOICE_OK ?       "             > OK  \n"              : "               OK    \n");
+		printf(field == CHOICE_EXIT ?     "             > EXIT\n"              : "               EXIT\n");
+		printf(                           "                                               \n");
 
 		gfxFlushBuffers();
 		gfxSwapBuffers();
 
 		gspWaitForVBlank();
 	}
+
+	if(field == CHOICE_EXIT)return -1;
 
 	if(choice[CHOICE_REGION] >= numChoices[CHOICE_REGION] - 1)choice[CHOICE_REGION] = -1;
 	if(choice[CHOICE_LANGUAGE] >= numChoices[CHOICE_LANGUAGE] - 1)choice[CHOICE_LANGUAGE] = -1;
@@ -329,7 +339,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 		FILE* f = fopen(fn, "w");
 		if(f)
 		{
-			fprintf(f, "region : %d\nlanguage : %d\nclock : %d\n", choice[CHOICE_REGION], choice[CHOICE_LANGUAGE], choice[CHOICE_CLOCK]);
+			fprintf(f, "region : %d\nlanguage : %d\nclock : %d\nromfs : %d\n", choice[CHOICE_REGION], choice[CHOICE_LANGUAGE], choice[CHOICE_CLOCK], choice[CHOICE_ROMFS]);
 
 			fclose(f);
 		}
@@ -338,17 +348,21 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock)
 	if(region_code)*region_code = choice[CHOICE_REGION];
 	if(language_code)*language_code = choice[CHOICE_LANGUAGE];
 	if(clock)*clock = choice[CHOICE_CLOCK];
+	if(romfs)*romfs = (choice[CHOICE_ROMFS] == 0);
 
 	return 0;
 }
 
-void doRegionFive(u8* code_data, u32 code_size)
+Result doRegionFive(u8* code_data, u32 code_size)
 {
     u8 region_code = 2;
     u8 language_code = 2;
     u8 clock = 0;
+    u8 romfs = 0;
 
-    configureTitle(&region_code, &language_code, &clock);
+    Result ret = configureTitle(&region_code, &language_code, &clock, &romfs);
+
+    if(ret)return ret;
 
     printf("region %X\n", region_code);
     printf("language %X\n", language_code);
@@ -376,19 +390,11 @@ void doRegionFive(u8* code_data, u32 code_size)
 		setClockrate(clock);
 	}
 
-	// TEMP
-	Handle fsHandle;
-	srvGetServiceHandle(&fsHandle, "fs:USER");
-	// {
-	// 	char directory[9];
-	// 	u64 tid = 0;
-	// 	getTitleInformation(NULL, &tid);
-	// 	sprintf(directory, "%08X", (unsigned int)(tid&0xFFFFFFFF));
-
-	// 	patchRedirectFs(code_data, code_size, fsHandle, directory);
-	// }
-
+	if(romfs)
 	{
+		Handle fsHandle;
+		srvGetServiceHandle(&fsHandle, "fs:USER");
+
 		char path[32];
 		u64 tid = 0;
 		getTitleInformation(NULL, &tid);
@@ -396,4 +402,6 @@ void doRegionFive(u8* code_data, u32 code_size)
 
 		patchFsOpenRom(code_data, code_size, fsHandle, path);
 	}
+
+	return 0;
 }

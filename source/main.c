@@ -146,34 +146,15 @@ Result loadCode()
 	return 0;
 }
 
-void patchCode()
+Result patchCode()
 {
 	printf("patchin\n");
 
-	// u8* data = (u8*)paramblk->code_data;
-
-	// int i;
-	// for(i=0; i<paramblk->code_size; i++)
-	// {
-	// 	// if(!memcmp(&data[i], "pikachu", 7))memcpy(&data[i], "lucario", 7);
-	// 	if(!memcmp(&data[i], "Pikachu", 7))memcpy(&data[i], "Lucario", 7);
-
-	// 	if(!(i&0xfffff))printf("\x1b[0;0H%d\n", (100*i)/paramblk->code_size);
-	// }
-
-	// strcpy((char*)&data[0x43D288], "rom:/actor/zelda_link_boy_new.zar");
-
-	// *(u32*)(&data[0x0013765C-0x00100000]) = 0xE12FFF1E ; // bx lr
-	// *(u32*)(&data[0x00162420-0x00100000]) = 0xE3A00001 ; // mov r0, #1 ; (USA)
-
-	// *(u32*)(&data[0x0013C7C8-0x00100000]) = 0x00000000;
-	// *(u32*)(&data[0x0013C7D4-0x00100000]) = 0x00000000;
-
-	// *(u32*)(&data[0x002163C8-0x00100000]) = 0xE3A00002; // mov r0, #2 ; (EUR)
-
-	doRegionFive((u8*)paramblk->code_data, paramblk->code_size);
+	Result ret = doRegionFive((u8*)paramblk->code_data, paramblk->code_size);
 
 	printf("ballin\n");
+
+	return ret;
 }
 
 Result NSS_LaunchTitle(Handle* handle, u64 tid, u8 flags)
@@ -305,30 +286,15 @@ int main(int argc, char **argv)
 
 	consoleInit(GFX_TOP, NULL);
 
-	printf("\x1b[15;19Hwhat is up\n");
-
-
-	// Result ret;
-	// u8 currentType;
-	// u32 requestedAppid, menuAppid, currentAppid;
-
-	// int i;
-	// for(i=0;i<5;i++)
-	// {
-	// 	aptOpenSession();
-	// 	ret=APT_GetAppletManInfo(NULL, i, &currentType, &requestedAppid, &menuAppid, &currentAppid);
-	// 	aptCloseSession();
-	// 	printf("%d (%x) : %x %x %x %x\n", i, ret, currentType, requestedAppid, menuAppid, currentAppid);
-	// }
-
+	printf("what is up\n");
 
 	paramblk = linearAlloc(sizeof(paramblk_t));
 
 	srvGetServiceHandle(&paramblk->nssHandle, "ns:s");
 
 	loadCode();
-	runLoader();
-	patchCode();
+	Result ret = patchCode();
+	if(!ret)runLoader();
 
 	hidScanInput();
 	if(hidKeysHeld() & KEY_Y)
@@ -339,29 +305,6 @@ int main(int argc, char **argv)
 			if(hidKeysDown() & KEY_START)break;
 		}
 	}
-
-
-	// // while (aptMainLoop())
-	// while(true)
-	// {
-	// 	hidScanInput();
-
-	// 	u32 kDown = hidKeysDown();
-
-	// 	// if (kDown & KEY_X) freeHomeMenuResources();
-	// 	// if (kDown & KEY_A) crashHomeMenu();
-	// 	// if (kDown & KEY_B) crashApp();
-	// 	// if (kDown & KEY_Y) loadCode();
-	// 	// if (kDown & KEY_L) patchCode();
-	// 	// if (kDown & KEY_SELECT) runLoader();
-	// 	// if (kDown & KEY_DOWN) retMenu();
-	// 	if (kDown & KEY_START) break;
-
-	// 	gfxFlushBuffers();
-	// 	gfxSwapBuffers();
-
-	// 	gspWaitForVBlank();
-	// }
 
 	gfxExit();
 	return 0;
