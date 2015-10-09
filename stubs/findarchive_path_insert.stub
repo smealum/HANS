@@ -1,0 +1,74 @@
+.nds
+
+.create "findarchive_path_insert.bin", 0x0
+
+.loadtable "../unicode.tbl"
+
+.arm
+path_insert:
+	mov r4, r0
+	sub r5, sp, #0x800
+
+	mov r0, r4
+	mov r1, r5
+	path_insert_loop1:
+		ldrh r2, [r0], #2
+		; strh r2, [r1], #2
+		cmp r2, #'/'
+		bne path_insert_loop1
+	mov r3, r0
+	add r0, pc, directory-.-8
+	path_insert_loop2:
+		ldrh r2, [r0], #2
+		cmp r2, #0
+		strneh r2, [r1], #2
+		bne path_insert_loop2
+	mov r0, r3
+	path_insert_loop3:
+		ldrh r2, [r0], #2
+		strh r2, [r1], #2
+		cmp r2, #0
+		bne path_insert_loop3
+
+	; find and replace references to string in saved registers
+	mov r1, #0
+	path_insert_loop4:
+		ldr r0, [sp, r1, lsl 2]
+		cmp r0, r4
+		streq r5, [sp, r1, lsl 2]
+		add r1, #1
+		cmp r1, #8
+		bne path_insert_loop4
+
+	; mov sp, r5
+	; .word 0xffffffff
+
+	mov r0, r5
+	blx r12
+
+	ldmfd sp!, {r4,r5,r6,r7,r8,r9,r10,r11,pc}
+
+.pool
+
+.align 0x4
+; directory:
+; 	.string "deadbabe/"
+; 	.byte 0x00, 0x00
+; directory_end:
+directory:
+	.string "rom:/deadbabe/"
+	.byte 0x00, 0x00
+directory_end:
+	
+	.align 0x4
+	thunk0:
+		stmfd sp!, {r4,r5,r6,r7,r8,r9,r10,r11,lr}
+		mov r12, pc ; should point to the nop
+		b path_insert
+		nop
+		ldr r12, [pc, #thunk0_data-.-8]
+		bx r12
+		thunk0_data:
+			.word 0xdeadbabe
+
+.Close

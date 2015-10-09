@@ -3,6 +3,7 @@
 
 #include "patch.h"
 
-void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle);
+void patchFsOpenRom(u8* code_data, u32 code_size, u32 romfsFileHandle);
+void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle, char* directory);
 
 #endif

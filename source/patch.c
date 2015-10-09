@@ -71,7 +71,7 @@ function_s findPooledCommandFunction(u8* code_data, u32 code_size, u32 pooled_va
     return (function_s){0,0};
 }
 
-function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_s ref, validationCallback_t callback)
+function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_s ref, validationCallback_t callback, u32* reference)
 {
     if(!code_data || !code_size)return (function_s){0,0};
     if(ref.start == ref.end)return (function_s){0,0};
@@ -87,6 +87,8 @@ function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_
         {
             function_s c = findFunction(code_data32, code_size32, i);
 
+            if(reference) *reference = i;
+
             if(callback)
             {
                 if(callback(code_data32, code_size32, c, i))return c;
@@ -94,5 +96,6 @@ function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_
         }
     }
 
+    if(reference) *reference = 0;
     return (function_s){0,0};
 }

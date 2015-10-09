@@ -11,6 +11,6 @@ typedef bool (*validationCallback_t)(u32* code_data32, u32 code_size32, function
 
 function_s findFunction(u32* code_data32, u32 code_size32, u32 start);
 function_s findPooledCommandFunction(u8* code_data, u32 code_size, u32 pooled_value);
-function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_s ref, validationCallback_t callback);
+function_s findFunctionReferenceFunction(u8* code_data, u32 code_size, function_s ref, validationCallback_t callback, u32* reference);
 
 #endif

@@ -1,0 +1,84 @@
+.nds
+
+.create "openfiledirectly.bin", 0x0
+
+.loadtable "../unicode.tbl"
+
+.arm
+openfiledirectly:
+	cmp r3, #3
+	beq romfs_handler
+	
+	ldr r12, [pc, #real_func-.-8]
+	nop
+	bx r12
+
+	romfs_handler:
+	stmfd sp!, {r1,r4}
+
+	mrc p15, 0, r0, c13, c0, 3
+
+	add r4, r0, #0x80
+	add r1, pc, cmd_buf-.-8
+	mov r2, #0
+	openfiledirectly_loop:
+		ldr r3, [r1, r2]
+		str r3, [r4, r2]
+		add r2, #4
+		cmp r2, #cmd_buf_end-cmd_buf
+		bne openfiledirectly_loop
+
+	add r0, pc, path-.-8
+	str r0, [r4, #path_ptr-cmd_buf]
+
+	mov r0, #path_end-path
+	str r0, [r4, #path_size-cmd_buf]
+
+	mov r0, r0, lsl 14
+	orr r0, #2
+	str r0, [r4, #path_size_2-cmd_buf]
+
+	ldr r0, [pc, #fs_handle-.-8]
+	.word 0xef000032
+
+    ldr r1, [sp], #4
+    ldr r0, [r4, #0xc]
+    str r0, [r1]
+    ldr r4, [sp], #4
+    mov r0, #0
+    bx lr
+
+.pool
+
+cmd_buf:
+	.word 0x08030204 ; 0x08030204
+	.word 0x0 ; 0
+	.word 0x9 ; archive.id;
+	.word 0x1 ; archive.lowPath.type;
+	.word 0x0 ; archive.lowPath.size;
+	.word 0x3 ; fileLowPath.type;
+	path_size:
+	.word 0x0 ; fileLowPath.size;
+	.word 0x1 ; openFlags;
+	.word 0x0 ; attributes;
+	.word 0x802 ; (archive.lowPath.size << 14) | 0x802;
+	.word 0x0 ; (u32)archive.lowPath.data;
+	path_size_2:
+	.word 0x0 ; (fileLowPath.size << 14) | 0x2;
+	path_ptr:
+	.word 0x0 ; (u32)fileLowPath.data;
+cmd_buf_end:
+
+path:
+	; .ascii "/mm.romfs"
+	.ascii "/sango.romfs"
+	.byte 0x00
+path_end:
+
+.align 0x4
+fs_handle:
+	.word 0xdeadbabe
+real_func:
+	.word 0xdeadbabe
+
+.Close

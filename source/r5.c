@@ -7,6 +7,7 @@
 #include "common.h"
 #include "darm.h"
 #include "r5.h"
+#include "fsredir.h"
 
 // it's time
 // for
@@ -378,5 +379,23 @@ void doRegionFive(u8* code_data, u32 code_size)
 	// TEMP
 	Handle fsHandle;
 	srvGetServiceHandle(&fsHandle, "fs:USER");
-	patchRedirectFs(code_data, code_size, fsHandle);
+	// {
+	// 	char directory[9];
+	// 	u64 tid = 0;
+	// 	getTitleInformation(NULL, &tid);
+	// 	sprintf(directory, "%08X", (unsigned int)(tid&0xFFFFFFFF));
+
+	// 	patchRedirectFs(code_data, code_size, fsHandle, directory);
+	// }
+
+	{
+		// Handle fileHandle;
+		// FS_archive sdmcArchive=(FS_archive){ARCH_SDMC, (FS_path){PATH_EMPTY, 1, (u8*)""}};
+		// FS_path filePath=FS_makePath(PATH_CHAR, "/mm.romfs");
+
+		// FSUSER_OpenFileDirectly(NULL, &fileHandle, sdmcArchive, filePath, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
+
+		// patchFsOpenRom(code_data, code_size, fileHandle);
+		patchFsOpenRom(code_data, code_size, fsHandle);
+	}
 }
