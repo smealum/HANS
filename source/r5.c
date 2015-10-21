@@ -8,6 +8,7 @@
 #include "darm.h"
 #include "r5.h"
 #include "fsredir.h"
+#include "nimpatch.h"
 
 // it's time
 // for
@@ -409,6 +410,10 @@ Result doRegionFive(u8* code_data, u32 code_size)
 	if(clock != 0xFF)
 	{
 		setClockrate(clock);
+	}
+
+	{
+		patchNimCheckSysupdateAvailableSOAP(code_data, code_size);
 	}
 
 	if(romfs)

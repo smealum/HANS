@@ -1,0 +1,13 @@
+.nds
+
+.create "nim_checkupdate.bin", 0x0
+
+.loadtable "../unicode.tbl"
+
+.arm
+	mov r1, #0
+	str r1, [r0]
+	mov r0, #0
+	bx lr
+
+.Close
