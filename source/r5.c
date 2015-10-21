@@ -226,16 +226,17 @@ typedef enum
 {
 	CHOICE_REGION = 0,
 	CHOICE_LANGUAGE = 1,
-	CHOICE_CLOCK = 2,
-	CHOICE_CODE = 3,
-	CHOICE_ROMFS = 4,
-	CHOICE_SAVE = 5,
-	CHOICE_OK = 6,
+	CHOICE_NIMUPDATE = 2,
+	CHOICE_CLOCK = 3,
+	CHOICE_CODE = 4,
+	CHOICE_ROMFS = 5,
+	CHOICE_SAVE = 6,
+	CHOICE_OK = 7,
 	CHOICE_EXIT,
 	CHOICE_NUM
 }choices_t;
 
-Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, u8* code)
+Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, u8* code, u8* nim)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -249,8 +250,8 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 
 	mkdir("titles", 777);
 
-	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), 0, 0};
-	int choice[] = {numChoices[0]-1, numChoices[1]-1, 0, 1, 1, 1, 0, 0};
+	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), 0, 0};
+	int choice[] = {numChoices[0]-1, numChoices[1]-1, 1, 0, 1, 1, 1, 0, 0};
 
 	hidScanInput();
 
@@ -263,6 +264,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 			{
 				if(sscanf(l, "region : %d", &choice[CHOICE_REGION]) != 1)
 				if(sscanf(l, "language : %d", &choice[CHOICE_LANGUAGE]) != 1);
+				if(sscanf(l, "nim_checkupdate : %d", &choice[CHOICE_NIMUPDATE]) != 1);
 				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
 				if(sscanf(l, "romfs : %d", &choice[CHOICE_ROMFS]) != 1);
 				if(sscanf(l, "code : %d", &choice[CHOICE_CODE]) != 1);
@@ -306,25 +308,26 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 		if(choice[field] >= numChoices[field]) choice[field] = 0;
 
 		printf("\x1b[0;0H\n");
-		printf(                           "               HANS             \n");
+		printf(                            "               HANS             \n");
 		printf("\n");
-		printf(field == CHOICE_REGION ?   "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[CHOICE_REGION]]);
-		printf(field == CHOICE_LANGUAGE ? "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[CHOICE_LANGUAGE]]);
-		printf(field == CHOICE_CLOCK ?    "  N3DS CPU clock     : < %s > \n" : "  N3DS CPU clock     :   %s   \n", clocks[choice[CHOICE_CLOCK]]);
-		printf(field == CHOICE_CODE ?     "  Code  -> SD        : < %s > \n" : "  Code  -> SD        :   %s   \n", yesno[choice[CHOICE_CODE]]);
-		printf(field == CHOICE_ROMFS ?    "  Romfs -> SD        : < %s > \n" : "  Romfs -> SD        :   %s   \n", yesno[choice[CHOICE_ROMFS]]);
-		printf(field == CHOICE_SAVE ?     "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[CHOICE_SAVE]]);
-		printf(                           "                                               \n");
-		printf(                           "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+		printf(field == CHOICE_REGION ?    "  Region             : < %s > \n" : "  Region             :   %s   \n", regions[choice[CHOICE_REGION]]);
+		printf(field == CHOICE_LANGUAGE ?  "  Language           : < %s > \n" : "  Language           :   %s   \n", languages[choice[CHOICE_LANGUAGE]]);
+		printf(field == CHOICE_NIMUPDATE ? "  FW Version Spoof   : < %s > \n" : "  FW Version Spoof   :   %s   \n", yesno[choice[CHOICE_NIMUPDATE]]);
+		printf(field == CHOICE_CLOCK ?     "  N3DS CPU clock     : < %s > \n" : "  N3DS CPU clock     :   %s   \n", clocks[choice[CHOICE_CLOCK]]);
+		printf(field == CHOICE_CODE ?      "  Code  -> SD        : < %s > \n" : "  Code  -> SD        :   %s   \n", yesno[choice[CHOICE_CODE]]);
+		printf(field == CHOICE_ROMFS ?     "  Romfs -> SD        : < %s > \n" : "  Romfs -> SD        :   %s   \n", yesno[choice[CHOICE_ROMFS]]);
+		printf(field == CHOICE_SAVE ?      "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[CHOICE_SAVE]]);
+		printf(                            "                                               \n");
+		printf(                            "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 		if(!choice[CHOICE_CODE])
-			printf(                       "  Code path          : sd:/hans/%08X.code \n", (unsigned int)(tid & 0xFFFFFFFF));
+			printf(                        "  Code path          : sd:/hans/%08X.code \n", (unsigned int)(tid & 0xFFFFFFFF));
 		if(!choice[CHOICE_ROMFS])
-			printf(                       "  Romfs path         : sd:/hans/%08X.romfs\n", (unsigned int)(tid & 0xFFFFFFFF));
-		printf(                           "                                               \n");
-		printf(field == CHOICE_OK ?       "             > OK  \n"              : "               OK    \n");
-		printf(field == CHOICE_EXIT ?     "             > EXIT\n"              : "               EXIT\n");
-		printf(                           "                                               \n");
-		printf(                           "                                               \n");
+			printf(                        "  Romfs path         : sd:/hans/%08X.romfs\n", (unsigned int)(tid & 0xFFFFFFFF));
+		printf(                            "                                               \n");
+		printf(field == CHOICE_OK ?        "             > OK  \n"              : "               OK    \n");
+		printf(field == CHOICE_EXIT ?      "             > EXIT\n"              : "               EXIT\n");
+		printf(                            "                                               \n");
+		printf(                            "                                               \n");
 
 		gfxFlushBuffers();
 		gfxSwapBuffers();
@@ -342,7 +345,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 		FILE* f = fopen(fn, "w");
 		if(f)
 		{
-			fprintf(f, "region : %d\nlanguage : %d\nclock : %d\nromfs : %d\ncode : %d\n", choice[CHOICE_REGION], choice[CHOICE_LANGUAGE], choice[CHOICE_CLOCK], choice[CHOICE_ROMFS], choice[CHOICE_CODE]);
+			fprintf(f, "region : %d\nlanguage : %d\nclock : %d\nromfs : %d\ncode : %d\nnim_checkupdate : %d\n", choice[CHOICE_REGION], choice[CHOICE_LANGUAGE], choice[CHOICE_CLOCK], choice[CHOICE_ROMFS], choice[CHOICE_CODE], choice[CHOICE_NIMUPDATE]);
 
 			fclose(f);
 		}
@@ -351,6 +354,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 	end:
 	if(region_code)*region_code = choice[CHOICE_REGION];
 	if(language_code)*language_code = choice[CHOICE_LANGUAGE];
+	if(nim)*nim = choice[CHOICE_NIMUPDATE] == 0;
 	if(clock)*clock = choice[CHOICE_CLOCK];
 	if(romfs)*romfs = (choice[CHOICE_ROMFS] == 0);
 	if(code)*code = (choice[CHOICE_CODE] == 0);
@@ -365,8 +369,9 @@ Result doRegionFive(u8* code_data, u32 code_size)
     u8 clock = 0;
     u8 romfs = 0;
     u8 code = 0;
+    u8 nim = 0;
 
-    Result ret = configureTitle(&region_code, &language_code, &clock, &romfs, &code);
+    Result ret = configureTitle(&region_code, &language_code, &clock, &romfs, &code, &nim);
 
     if(ret)return ret;
     
@@ -412,6 +417,7 @@ Result doRegionFive(u8* code_data, u32 code_size)
 		setClockrate(clock);
 	}
 
+	if(nim)
 	{
 		patchNimCheckSysupdateAvailableSOAP(code_data, code_size);
 	}
