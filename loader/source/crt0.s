@@ -2,10 +2,10 @@
 .arm
 .align 4
 .global _heap_size
+.global _firm_appmemalloc
 
-@ first instruction is here for later
-@ should be skipped when trying to run loader
-svc 0x32
+_firm_appmemalloc:
+	.word 0x07C00000
 
 @ reset stack
 mov sp, #0x10000000

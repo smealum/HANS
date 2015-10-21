@@ -1,9 +1,13 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#define FIRM_APPMEMALLOC 0x07C00000 // N3ds-only (obviously TEMP)
-#define FIRM_APPMEMALLOC_LINEAR 0x37C00000 // N3ds-only (obviously TEMP)
-#define MENU_LOADEDROP_BUFADR (0x38C40000) // N3ds-only (obviously TEMP)
+extern u32 _firm_appmemalloc;
+
+// #define FIRM_APPMEMALLOC 0x07C00000 // N3ds-only (obviously TEMP)
+// #define FIRM_APPMEMALLOC 0x04000000 // o3ds-only (obviously TEMP)
+#define FIRM_APPMEMALLOC _firm_appmemalloc
+#define FIRM_APPMEMALLOC_LINEAR (0x30000000 + FIRM_APPMEMALLOC)
+#define MENU_LOADEDROP_BUFADR (0x30000000 + 0x01040000)
 #define MENU_LOADEDROP_BKP_BUFADR ((MENU_LOADEDROP_BUFADR + 0x8000))
 
 #define HANS_LOADER_SIZE (0x8000)

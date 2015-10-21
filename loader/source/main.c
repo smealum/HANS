@@ -45,7 +45,6 @@ void gspGpuInit()
 	//wait until we can write stuff to it
 	svc_waitSynchronization1(gspEvent, 0x55bcb0);
 
-	//GSP shared mem : 0x2779F000
 	gxCmdBuf=(u32*)(0x10002000+0x800+threadID*0x200);
 
 	top_framebuffer = &gspHeap[0];
@@ -270,20 +269,6 @@ void invalidateIcache(Handle nssHandle)
 	print_str("invalidated icache\n");
 }
 
-void crashHomeMenu()
-{
-	doGspwn((void*)gspHeap, (void*)(MENU_LOADEDROP_BUFADR-0x100), 0x100);
-	svc_sleepThread(20*1000*1000);
-
-	// ghetto dcache invalidation
-	// don't judge me
-	int j;//, i;
-	for(j=0; j<0x4; j++)
-		drawTitleScreen(console_buffer);
-		// for(i=0; i<0x00100000/0x4; i+=0x4)
-		// 	((u32*)gspHeap)[i+j]^=0xDEADBABE;
-}
-
 extern Handle gspGpuHandle;
 
 void runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
@@ -299,9 +284,6 @@ void runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
 	Handle local_gspGpuHandle = gspGpuHandle;
 	Handle local_gspSharedMemHandle = gspSharedMemHandle;
 	void (*local_stub)(Handle gsp, Handle nss, Handle gspMem) = stub;
-
-	// // crash home menu
-	// crashHomeMenu();
 
 	// free GSP heap
 	svc_controlMemory(&tmp, (u32)gspHeap, 0x0, gspHeap_size, MEMOP_FREE, 0x0);
@@ -326,7 +308,8 @@ void _main(paramblk_t* p)
 	gspGpuInit();
 
 	resetConsole();
-	print_str("hello\n");
+	print_str("hello ?\n");
+	print_str("_firm_appmemalloc "); print_hex((u32)_firm_appmemalloc); print_str("\n");
 	print_str("code address "); print_hex((u32)p->code_data); print_str("\n");
 	print_str("code size    "); print_hex(p->code_size); print_str("\n");
 

@@ -8,6 +8,8 @@
 #include "r5.h"
 #include "loader_bin.h"
 
+u32 _firm_appmemalloc = 0x04000000;
+
 paramblk_t* paramblk = NULL;
 
 Result gspwn(void* dst, void* src, u32 size)
@@ -232,6 +234,7 @@ void runLoader()
 
 	memcpy(buffer, loader_bin, loader_bin_size);
 
+	((u32*)buffer)[0] = _firm_appmemalloc;
 	Result ret = GSPGPU_FlushDataCache(NULL, buffer, HANS_LOADER_SIZE);
 	ret = gspwn((void*)(FIRM_APPMEMALLOC_LINEAR - processMap.processLinearOffset), buffer, HANS_LOADER_SIZE);
 	svcSleepThread(20*1000*1000);
@@ -298,6 +301,12 @@ int main(int argc, char **argv)
 	consoleInit(GFX_TOP, NULL);
 
 	printf("what is up\n");
+
+	{
+		u8 n3ds = 0;
+		APT_CheckNew3DS(NULL, &n3ds);
+		_firm_appmemalloc = n3ds ? 0x07c00000 : 0x04000000;
+	}
 
 	paramblk = linearAlloc(sizeof(paramblk_t));
 
