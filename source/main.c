@@ -89,6 +89,16 @@ Result getTitleInformation(u8* mediatype, u64* tid)
 	return ret;
 }
 
+Result openCode(Handle* out, u64 tid, u8 mediatype)
+{
+	if(!out)return -1;
+
+	u32 archivePath[] = {tid & 0xFFFFFFFF, (tid >> 32) & 0xFFFFFFFF, mediatype, 0x00000000};
+	static const u32 filePath[] = {0x00000000, 0x00000000, 0x00000002, 0x646F632E, 0x00000065};
+
+	return FSUSER_OpenFileDirectly(NULL, out, (FS_archive){0x2345678a, (FS_path){PATH_BINARY, 0x10, (u8*)archivePath}}, (FS_path){PATH_BINARY, 0x14, (u8*)filePath}, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
+}
+
 Result loadCode()
 {
 	Result ret;
@@ -101,11 +111,12 @@ Result loadCode()
 
 	printf("%08X : %d, %08X, %08X\n", (unsigned int)ret, mediatype, (unsigned int)tid & 0xFFFFFFFF, (unsigned int)(tid >> 32) & 0xFFFFFFFF);
 
-	u32 archivePath[] = {tid & 0xFFFFFFFF, (tid >> 32) & 0xFFFFFFFF, mediatype, 0x00000000};
-	static const u32 filePath[] = {0x00000000, 0x00000000, 0x00000002, 0x646F632E, 0x00000065};
+	// // if we supported updates we'd do this
+	// ret = openCode(&fileHandle, tid | 0x0000000E00000000LL, 1);
+	// if(ret) ret = openCode(&fileHandle, tid, mediatype);
 
-	// ret = FSUSER_OpenFileDirectly(&localFsHandle, &fileHandle, (FS_archive){0x00000003, (FS_path){PATH_EMPTY, 1, (u8*)""}}, (FS_path){PATH_BINARY, 0x14, (u8*)filePath}, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
-	ret = FSUSER_OpenFileDirectly(NULL, &fileHandle, (FS_archive){0x2345678a, (FS_path){PATH_BINARY, 0x10, (u8*)archivePath}}, (FS_path){PATH_BINARY, 0x14, (u8*)filePath}, FS_OPEN_READ, FS_ATTRIBUTE_NONE);
+	// but right now we don't so too bad
+	ret = openCode(&fileHandle, tid, mediatype);
 
 	printf("loading code : %08X\n", (unsigned int)ret);
 
