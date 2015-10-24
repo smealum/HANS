@@ -263,7 +263,7 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 	int i, j;
 	int n = strlen(fn);
 	for(j=n-1; j>=0; j--) if(fn[j] == '/') break;
-	for(i=j; i<n && fn[i] != '.' && j<10; i++) name[i-j] = fn[i];
+	j++; for(i=j; i<n && fn[i] != '.' && (i-j)<10; i++) name[i-j] = fn[i];
 	name[i-j] = '\0';
 
 	snprintf(romfs_path, 128, "/hans/%s.romfs", name);

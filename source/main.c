@@ -305,6 +305,7 @@ int main(int argc, char **argv)
 	int i;
 	for(i=0; i<argc; i++)
 	{
+		printf("argv %d %s\n", i, argv[i]);
 		if(argv[i][0] == '-')
 		{
 			switch(argv[i][1])
@@ -330,6 +331,17 @@ int main(int argc, char **argv)
 					}
 					break;
 			}
+		}
+	}
+	if(configuration_file)printf("configuration_file %s\n", configuration_file);
+
+	hidScanInput();
+	if(hidKeysHeld() & KEY_Y)
+	{
+		while(true)
+		{
+			hidScanInput();
+			if(hidKeysDown() & KEY_START)break;
 		}
 	}
 
