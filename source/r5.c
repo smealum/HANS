@@ -336,9 +336,9 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 		printf(                            "                                               \n");
 		printf(                            "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 		if(!choice[CHOICE_CODE])
-			printf(                        "  Code path          : sd:%s \n", romfs_path);
+			printf(                        "  Code path          : sd:%s \n", code_path);
 		if(!choice[CHOICE_ROMFS])
-			printf(                        "  Romfs path         : sd:%s\n", code_path);
+			printf(                        "  Romfs path         : sd:%s\n", romfs_path);
 		printf(                            "                                               \n");
 		printf(field == CHOICE_OK ?        "             > OK  \n"              : "               OK    \n");
 		printf(field == CHOICE_EXIT ?      "             > EXIT\n"              : "               EXIT\n");
