@@ -236,7 +236,7 @@ typedef enum
 	CHOICE_NUM
 }choices_t;
 
-Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, u8* code, u8* nim)
+Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, u8* romfs, u8* code, u8* nim)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -245,8 +245,10 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 
 	if(!tid)return -1;
 
-	static char fn[256];
-	sprintf(fn, "titles/%08X%08X.txt", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+	static char _fn[256];
+	char* fn = _fn;
+	if(cfg_path) fn = cfg_path;
+	else sprintf(fn, "titles/%08X%08X.txt", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 
 	mkdir("titles", 777);
 
@@ -362,7 +364,7 @@ Result configureTitle(u8* region_code, u8* language_code, u8* clock, u8* romfs, 
 	return 0;
 }
 
-Result doRegionFive(u8* code_data, u32 code_size)
+Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 {
     u8 region_code = 2;
     u8 language_code = 2;
@@ -371,7 +373,7 @@ Result doRegionFive(u8* code_data, u32 code_size)
     u8 code = 0;
     u8 nim = 0;
 
-    Result ret = configureTitle(&region_code, &language_code, &clock, &romfs, &code, &nim);
+    Result ret = configureTitle(cfg_path, &region_code, &language_code, &clock, &romfs, &code, &nim);
 
     if(ret)return ret;
     

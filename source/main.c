@@ -159,11 +159,11 @@ Result loadCode()
 	return 0;
 }
 
-Result patchCode()
+Result patchCode(char* cfg_path)
 {
 	printf("patchin\n");
 
-	Result ret = doRegionFive((u8*)paramblk->code_data, paramblk->code_size);
+	Result ret = doRegionFive((u8*)paramblk->code_data, paramblk->code_size, cfg_path);
 
 	printf("ballin\n");
 
@@ -300,6 +300,39 @@ int main(int argc, char **argv)
 
 	consoleInit(GFX_TOP, NULL);
 
+	char* configuration_file = NULL;
+
+	int i;
+	for(i=0; i<argc; i++)
+	{
+		if(argv[i][0] == '-')
+		{
+			switch(argv[i][1])
+			{
+				case 'f':
+					{
+						// file option : passes a path to a given title configuration file
+						// if the path is invalid we ignore this option
+						char* path = &argv[i][3];
+						if(argv[i][2] != ' ') path = &argv[i][2]; // covers the case where we have -fpath and the case where it's just -f
+
+						FILE* f = fopen(path, "r");
+						if(f)
+						{
+							fclose(f);
+
+							configuration_file = malloc(strlen(path) + 1);
+							if(configuration_file)
+							{
+								strcpy(configuration_file, path);
+							}
+						}
+					}
+					break;
+			}
+		}
+	}
+
 	printf("what is up\n");
 
 	{
@@ -313,7 +346,7 @@ int main(int argc, char **argv)
 	srvGetServiceHandle(&paramblk->nssHandle, "ns:s");
 
 	loadCode();
-	Result ret = patchCode();
+	Result ret = patchCode(configuration_file);
 	if(!ret)runLoader();
 
 	hidScanInput();
@@ -325,6 +358,8 @@ int main(int argc, char **argv)
 			if(hidKeysDown() & KEY_START)break;
 		}
 	}
+
+	if(configuration_file) free(configuration_file);
 
 	gfxExit();
 	return 0;
