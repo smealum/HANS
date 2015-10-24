@@ -236,7 +236,7 @@ typedef enum
 	CHOICE_NUM
 }choices_t;
 
-Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, u8* romfs, u8* code, u8* nim)
+Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, char** romfs, char** code, u8* nim)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -248,12 +248,26 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 	static char _fn[256];
 	char* fn = _fn;
 	if(cfg_path) fn = cfg_path;
-	else sprintf(fn, "titles/%08X%08X.txt", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+	else sprintf(fn, "titles/%08X.txt", (unsigned int)(tid & 0xffffffff));
 
 	mkdir("titles", 777);
 
 	u8 numChoices[] = {sizeof(regions) / sizeof(regions[0]), sizeof(languages) / sizeof(languages[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(clocks) / sizeof(clocks[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), sizeof(yesno) / sizeof(yesno[0]), 0, 0};
 	int choice[] = {numChoices[0]-1, numChoices[1]-1, 1, 0, 1, 1, 1, 0, 0};
+
+	static char romfs_path[128];
+	static char code_path[128];
+	static char name[16];
+
+	// grab config name from path
+	int i, j;
+	int n = strlen(fn);
+	for(j=n-1; j>=0; j--) if(fn[j] == '/') break;
+	for(i=j; i<n && fn[i] != '.' && j<10; i++) name[i-j] = fn[i];
+	name[i-j] = '\0';
+
+	snprintf(romfs_path, 128, "/hans/%s.romfs", name);
+	snprintf(code_path, 128, "/hans/%s.code", name);
 
 	hidScanInput();
 
@@ -322,9 +336,9 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 		printf(                            "                                               \n");
 		printf(                            "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 		if(!choice[CHOICE_CODE])
-			printf(                        "  Code path          : sd:/hans/%08X.code \n", (unsigned int)(tid & 0xFFFFFFFF));
+			printf(                        "  Code path          : sd:%s \n", romfs_path);
 		if(!choice[CHOICE_ROMFS])
-			printf(                        "  Romfs path         : sd:/hans/%08X.romfs\n", (unsigned int)(tid & 0xFFFFFFFF));
+			printf(                        "  Romfs path         : sd:%s\n", code_path);
 		printf(                            "                                               \n");
 		printf(field == CHOICE_OK ?        "             > OK  \n"              : "               OK    \n");
 		printf(field == CHOICE_EXIT ?      "             > EXIT\n"              : "               EXIT\n");
@@ -358,8 +372,9 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 	if(language_code)*language_code = choice[CHOICE_LANGUAGE];
 	if(nim)*nim = choice[CHOICE_NIMUPDATE] == 0;
 	if(clock)*clock = choice[CHOICE_CLOCK];
-	if(romfs)*romfs = (choice[CHOICE_ROMFS] == 0);
-	if(code)*code = (choice[CHOICE_CODE] == 0);
+	// romfs_path and code_path are static so as long as we're not idiots this is totally fine
+	if(romfs)*romfs = (choice[CHOICE_ROMFS] == 0) ? romfs_path : NULL;
+	if(code)*code = (choice[CHOICE_CODE] == 0) ? code_path : NULL;
 
 	return 0;
 }
@@ -369,9 +384,9 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
     u8 region_code = 2;
     u8 language_code = 2;
     u8 clock = 0;
-    u8 romfs = 0;
-    u8 code = 0;
     u8 nim = 0;
+    char* romfs = NULL;
+    char* code = NULL;
 
     Result ret = configureTitle(cfg_path, &region_code, &language_code, &clock, &romfs, &code, &nim);
 
@@ -383,7 +398,7 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 	if(code)
 	{
 		char path[32];
-		sprintf(path, "sdmc:/hans/%08X.code", (unsigned int)(tid&0xFFFFFFFF));
+		sprintf(path, "sdmc:%s", code);
 
 		FILE* f = fopen(path, "rb");
 		if(!f)return -1;
@@ -429,10 +444,7 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 		Handle fsHandle;
 		srvGetServiceHandle(&fsHandle, "fs:USER");
 
-		char path[32];
-		sprintf(path, "/hans/%08X.romfs", (unsigned int)(tid&0xFFFFFFFF));
-
-		patchFsOpenRom(code_data, code_size, fsHandle, path);
+		patchFsOpenRom(code_data, code_size, fsHandle, romfs);
 	}
 
 	return 0;
