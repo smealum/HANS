@@ -479,7 +479,7 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle, char* path)
     {
         if(code_data32[i] == 0x6E61682f) // "/han"
         {
-            strncpy((char*)&code_data32[i], path, 21);
+            strncpy((char*)&code_data32[i], path, 23);
         }else if(code_data32[i] == 0xdeaddad0)
         {
             code_data32[i] = strlen(path) + 1;
