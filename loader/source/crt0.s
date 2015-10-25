@@ -8,31 +8,40 @@ _firm_appmemalloc:
 	.word 0x07C00000
 
 @ reset stack
-mov sp, #0x10000000
+@ mov sp, #0x10000000
+ldr sp, =_bss_start
 
 @ allocate bss/heap
 @ no need to initialize as OS does that already.
 stmfd sp!, {r0, r1, r2, r3, r4}
 
-	@ MEMOP COMMIT
-	ldr r0, =0x3
-	@ addr0
-	mov r1, #0x08000000
-	@ addr1
+@	@ MEMOP COMMIT
+@	ldr r0, =0x3
+@	@ addr0
+@	mov r1, #0x08000000
+@	@ addr1
+@	mov r2, #0
+@	@ size
+@	adr r3, _heap_size
+@	ldr r3, [r3]
+@	@ RW permissions
+@	mov r4, #3
+
+@	@ svcControlMemory
+@	svc 0x01
+
+@	@ save heap address
+@	mov r1, #0x08000000
+@	ldr r2, =_heap_base
+@	str r1, [r2]
+
+	ldr r0, =_bss_start
+	ldr r1, =_bss_end
 	mov r2, #0
-	@ size
-	adr r3, _heap_size
-	ldr r3, [r3]
-	@ RW permissions
-	mov r4, #3
-
-	@ svcControlMemory
-	svc 0x01
-
-	@ save heap address
-	mov r1, #0x08000000
-	ldr r2, =_heap_base
-	str r1, [r2]
+	memclear_loop:
+		str r2, [r0], #4
+		cmp r0, r1
+		blt memclear_loop
 
 ldmfd sp!, {r0, r1, r2, r3, r4}
 

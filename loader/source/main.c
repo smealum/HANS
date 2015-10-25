@@ -194,9 +194,11 @@ void print_hex(u32 val)
 	print_str(str);
 }
 
-void apply_map(memorymap_t* m, u8* code_data, u32 code_skip)
+Result apply_map(memorymap_t* m, u8* code_data, u32 code_skip)
 {
-	if(!m)return;
+	if(!m)return -1;
+
+	Result ret = 0;
 	int i;
 	for(i=0; i<m->num; i++)
 	{
@@ -216,7 +218,8 @@ void apply_map(memorymap_t* m, u8* code_data, u32 code_skip)
 			int size = remaining_size;
 			if(size > 0x00080000)size = 0x00080000;
 
-			GSPGPU_FlushDataCache(NULL, (u8*)&code_data[m->map[i].src + offset], size);
+			ret = GSPGPU_FlushDataCache(NULL, (u8*)&code_data[m->map[i].src + offset], size);
+			if(ret) return ret;
 			svc_sleepThread(5*1000*1000);
 			doGspwn((u32*)&code_data[m->map[i].src - 0x00100000 + offset], (u32*)(FIRM_APPMEMALLOC_LINEAR - m->processLinearOffset + m->map[i].dst + offset), size);
 
@@ -224,6 +227,8 @@ void apply_map(memorymap_t* m, u8* code_data, u32 code_skip)
 			offset += size;
 		}
 	}
+
+	return ret;
 }
 
 typedef struct {
@@ -256,29 +261,33 @@ void setupStub(u8* code_data)
 	stub = (void*)(0x00100000 + minfo.size - HANS_STUB_OFFSET);
 }
 
-void invalidateIcache(Handle nssHandle)
+Result invalidateIcache(Handle nssHandle)
 {
 	Result ret = NSS_LaunchTitle(&nssHandle, 0x0004013000002A02LL, 0x1);
-	if(ret)return;
+	if(ret)return ret;
 
 	svc_sleepThread(100*1000*1000);
 
 	ret = NSS_TerminateProcessTID(&nssHandle, 0x0004013000002A02LL, 100*1000*1000);
-	if(ret)return;
+	if(ret)return ret;
 
 	print_str("invalidated icache\n");
+
+	return 0;
 }
 
 extern Handle gspGpuHandle;
 
-void runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
+Result runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
 {
 	u32 tmp;
 
 	// flush code we're about to copy
 	void* src_adr = (void*)(code_data);
 	void* dst_adr = (void*)(FIRM_APPMEMALLOC_LINEAR - m->processLinearOffset);
-	GSPGPU_FlushDataCache(NULL, src_adr, HANS_LOADER_SIZE);
+	Result ret = GSPGPU_FlushDataCache(NULL, src_adr, HANS_LOADER_SIZE);
+
+	if(ret)return ret;
 
 	// need to load those now because we're about to unmap bss
 	Handle local_gspGpuHandle = gspGpuHandle;
@@ -291,10 +300,12 @@ void runStub(Handle nssHandle, memorymap_t* m, u8* code_data)
 	// start copying code
 	doGspwn(src_adr, dst_adr, HANS_LOADER_SIZE);
 
-	// free heap (includes bss !)
-	svc_controlMemory(&tmp, (u32)0x08000000, 0x0, _heap_size, MEMOP_FREE, 0x0);
+	// // free heap (includes bss !)
+	// svc_controlMemory(&tmp, (u32)0x08000000, 0x0, _heap_size, MEMOP_FREE, 0x0);
 
 	local_stub(local_gspGpuHandle, nssHandle, local_gspSharedMemHandle);
+
+	return 0;
 }
 
 void _main(paramblk_t* p)
@@ -308,18 +319,20 @@ void _main(paramblk_t* p)
 	gspGpuInit();
 
 	resetConsole();
-	print_str("hello ?\n");
+	print_str("hello\n");
 	print_str("_firm_appmemalloc "); print_hex((u32)_firm_appmemalloc); print_str("\n");
 	print_str("code address "); print_hex((u32)p->code_data); print_str("\n");
 	print_str("code size    "); print_hex(p->code_size); print_str("\n");
 
 	setupStub((u8*)p->code_data);
 
-	apply_map(&p->map, (u8*)p->code_data, HANS_LOADER_SIZE);
+	Result ret = apply_map(&p->map, (u8*)p->code_data, HANS_LOADER_SIZE);
+	print_str("applied map  "); print_hex(ret); print_str("\n");
 
-	invalidateIcache(p->nssHandle);
+	ret = invalidateIcache(p->nssHandle);
 
-	runStub(p->nssHandle, &p->map, (u8*)p->code_data);
+	ret = runStub(p->nssHandle, &p->map, (u8*)p->code_data);
+	print_hex(ret);
 
 	while(1);
 	gspGpuExit();
