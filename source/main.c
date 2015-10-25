@@ -294,11 +294,16 @@ void __appExit() {
 	srvExit();
 }
 
+PrintConsole topScreen, bottomScreen;
+
 int main(int argc, char **argv)
 {
 	gfxInitDefault();
 
-	consoleInit(GFX_TOP, NULL);
+	consoleInit(GFX_TOP, &topScreen);
+	consoleInit(GFX_BOTTOM, &bottomScreen);
+
+	consoleSelect(&topScreen);
 
 	char* configuration_file = NULL;
 

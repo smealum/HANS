@@ -217,6 +217,8 @@ u8* loadSmdh(u64 tid, u8 mediatype)
 	return fileBuffer;
 }
 
+extern PrintConsole topScreen, bottomScreen;
+
 char* regions[] = {"JPN", "USA", "EUR", "AUS", "CHN", "KOR", "TWN", "---"};
 char* languages[] = {"JP", "EN", "FR", "DE", "IT", "ES", "ZH", "KO", "NL", "PT", "RU", "TW", "--"};
 char* yesno[] = {"YES", "NO"};
@@ -235,6 +237,20 @@ typedef enum
 	CHOICE_EXIT,
 	CHOICE_NUM
 }choices_t;
+
+char *descriptions[] =
+{
+	"Use this to force the region value used by your game. '--' means your console's actual region value will be used. Choosing the wrong value here may cause some games to crash.",
+	"Use this to force the language setting used by your game. '--' means your console's actual language setting will be used. Choosing the wrong setting here may cause some games to crash.",
+	"Use this to enable certain apps which check your console's firmware version to work without updating. This can be used to enable eShop use on older firmware versions, for example.",
+	"Use this to force the use of a certain CPU clock rate in game. This will only work on N3DS.",
+	"Replace the app's code with a file loaded from your SD card. The file should not be compressed.",
+	"Redirect the app's romfs reads to a file on your SD card. The file should be a standard ROMFS partition with the first 0x1000 bytes stripped.",
+	"Select this if you want to save these settings and not be prompted for them every time you run this game. If you want to change saved settings, just hold L the next time you start HANS.",
+	"Select this to confirm your settings and run your game.",
+	"Select this to cancel and return to the homebrew launcher.",
+	""
+};
 
 Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, char** romfs, char** code, u8* nim)
 {
@@ -323,6 +339,8 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 		if(choice[field] < 0) choice[field] = numChoices[field] - 1;
 		if(choice[field] >= numChoices[field]) choice[field] = 0;
 
+		consoleSelect(&topScreen);
+
 		printf("\x1b[0;0H\n");
 		printf(                            "               HANS             \n");
 		printf("\n");
@@ -345,6 +363,11 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 		printf(                            "                                               \n");
 		printf(                            "                                               \n");
 
+		consoleSelect(&bottomScreen);
+		printf("\x1b[0;0H\n");
+		printf("Description :\n");
+		printf("    %s%*s", descriptions[field], 240 - strlen(descriptions[field]), " ");
+
 		gfxFlushBuffers();
 		gfxSwapBuffers();
 
@@ -353,8 +376,8 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 
 	if(field == CHOICE_EXIT)return -1;
 
-	if(choice[CHOICE_REGION] >= numChoices[CHOICE_REGION] - 1)choice[CHOICE_REGION] = -1;
-	if(choice[CHOICE_LANGUAGE] >= numChoices[CHOICE_LANGUAGE] - 1)choice[CHOICE_LANGUAGE] = -1;
+	if(choice[CHOICE_REGION] >= numChoices[CHOICE_REGION] - 1) choice[CHOICE_REGION] = -1;
+	if(choice[CHOICE_LANGUAGE] >= numChoices[CHOICE_LANGUAGE] - 1) choice[CHOICE_LANGUAGE] = -1;
 
 	if(choice[CHOICE_SAVE] == 0)
 	{
