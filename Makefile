@@ -32,6 +32,10 @@ SOURCES		:=	source
 DATA		:=	data stubs
 INCLUDES	:=	include
 
+APP_TITLE := HANS
+APP_DESCRIPTION := Enhance your game experience.
+APP_AUTHOR := smea
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------

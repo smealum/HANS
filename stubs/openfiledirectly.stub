@@ -71,7 +71,7 @@ cmd_buf_end:
 
 .align 0x4
 path:
-	.ascii "/hans/deadbabe.romfs"
+	.ascii "/hans/deadbabe__.romfs"
 	.byte 0x00
 path_end:
 
