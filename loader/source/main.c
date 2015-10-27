@@ -216,7 +216,7 @@ Result apply_map(memorymap_t* m, u8* code_data, u32 code_skip)
 		while(remaining_size > 0)
 		{
 			int size = remaining_size;
-			if(size > 0x00080000)size = 0x00080000;
+			if(size > 0x00080000) size = 0x00080000;
 
 			ret = GSPGPU_FlushDataCache(NULL, (u8*)&code_data[m->map[i].src + offset], size);
 			if(ret) return ret;

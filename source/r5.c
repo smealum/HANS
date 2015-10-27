@@ -141,6 +141,8 @@ void setClockrate(u8 setting)
 	int j, i;
 	u32* patchArea = linearAlloc(0x00100000);
 
+	if(setting != 0) setting = 3;
+
 	// grab waitLoop stub
 	GSPGPU_FlushDataCache(NULL, (u8*)patchArea, 0x100);
 	gspwn(patchArea, (u32*)(MENU_LOADEDROP_BUFADR-0x100), 0x100);
@@ -252,6 +254,24 @@ char *descriptions[] =
 	""
 };
 
+Result checkRomfs(char* _path)
+{
+	if(!_path)return -1;
+
+	static char path[256];
+	snprintf(path, 255, "sdmc:%s", _path);
+
+	FILE* f = fopen(path, "rb");
+	if(!f)return -2;
+
+	u32 tmp = 0;
+	fread(&tmp, 4, 1, f);
+
+	fclose(f);
+
+	return (tmp == 0x43465649) ? -3 : 0; // IVFC
+}
+
 Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, char** romfs, char** code, u8* nim)
 {
 	u8 mediatype = 0;
@@ -284,6 +304,8 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 
 	snprintf(romfs_path, 128, "/hans/%s.romfs", name);
 	snprintf(code_path, 128, "/hans/%s.code", name);
+
+	Result romfsValid = checkRomfs(romfs_path);
 
 	hidScanInput();
 
@@ -352,12 +374,13 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 		printf(field == CHOICE_ROMFS ?     "  Romfs -> SD        : < %s > \n" : "  Romfs -> SD        :   %s   \n", yesno[choice[CHOICE_ROMFS]]);
 		printf(field == CHOICE_SAVE ?      "  Save configuration : < %s > \n" : "  Save configuration :   %s   \n", yesno[choice[CHOICE_SAVE]]);
 		printf(                            "                                               \n");
-		printf(                            "  Current title      : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
+		printf(                            "  Current title        : %08X%08X        \n", (unsigned int)(tid >> 32), (unsigned int)(tid & 0xFFFFFFFF));
 		if(!choice[CHOICE_CODE])
-			printf(                        "  Code path          : sd:%s \n", code_path);
+			printf(                        "  Code path            : sd:%s \n", code_path);
 		if(!choice[CHOICE_ROMFS])
-			printf(                        "  Romfs path         : sd:%s\n", romfs_path);
-		printf(                            "                                               \n");
+			printf(!romfsValid ?           "  Romfs path           : sd:%s\n" : "  Romfs path (INVALID) : sd:%s\n", romfs_path);
+		printf(                            "                                                  ");
+		printf(                            "                                                  ");
 		printf(field == CHOICE_OK ?        "             > OK  \n"              : "               OK    \n");
 		printf(field == CHOICE_EXIT ?      "             > EXIT\n"              : "               EXIT\n");
 		printf(                            "                                               \n");

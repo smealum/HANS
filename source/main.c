@@ -29,7 +29,7 @@ void buildMap(memorymap_t* mm, u32 size)
 	u32 current_offset = 0x00000000;
 
 	int i;
-	for(i=0; i<2; i++)
+	for(i=0; i<3; i++)
 	{
 		const u32 mask = 0x000fffff >> (4*i);
 		u32 section_size = current_size & ~mask;
@@ -38,6 +38,7 @@ void buildMap(memorymap_t* mm, u32 size)
 			if(!mm->num) mm->processLinearOffset = section_size;
 			current_offset += section_size;
 			mm->map[mm->num++] = (memorymap_entry_t){0x00100000 + current_offset - section_size, mm->processLinearOffset - current_offset, section_size};
+			printf("%d : %08X - %08X\n", mm->num-1, mm->map[mm->num-1].dst, mm->map[mm->num-1].dst + mm->map[mm->num-1].size);
 			current_size -= section_size;
 		}
 	}
@@ -340,6 +341,12 @@ int main(int argc, char **argv)
 	}
 	if(configuration_file)printf("configuration_file %s\n", configuration_file);
 
+	printf("what is up\n");
+
+	paramblk = linearAlloc(sizeof(paramblk_t));
+	srvGetServiceHandle(&paramblk->nssHandle, "ns:s");
+	loadCode();
+
 	hidScanInput();
 	if(hidKeysHeld() & KEY_Y)
 	{
@@ -350,19 +357,12 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("what is up\n");
-
 	{
 		u8 n3ds = 0;
 		APT_CheckNew3DS(NULL, &n3ds);
 		_firm_appmemalloc = n3ds ? 0x07c00000 : 0x04000000;
 	}
 
-	paramblk = linearAlloc(sizeof(paramblk_t));
-
-	srvGetServiceHandle(&paramblk->nssHandle, "ns:s");
-
-	loadCode();
 	Result ret = patchCode(configuration_file);
 	if(!ret)runLoader();
 
