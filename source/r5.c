@@ -247,7 +247,7 @@ char *descriptions[] =
 	"Use this to enable certain apps which check your console's firmware version to work without updating. This can be used to enable eShop use on older firmware versions, for example.",
 	"Use this to force the use of a certain CPU clock rate in game. This will only work on N3DS.",
 	"Replace the app's code with a file loaded from your SD card. The file should not be compressed.",
-	"Redirect the app's romfs reads to a file on your SD card. The file should be a standard ROMFS partition with the first 0x1000 bytes stripped.",
+	"Redirect the app's romfs reads to a file on your SD card. The file should be a standard ROMFS partition.",
 	"Select this if you want to save these settings and not be prompted for them every time you run this game. If you want to change saved settings, just hold L the next time you start HANS.",
 	"Select this to confirm your settings and run your game.",
 	"Select this to cancel and return to the homebrew launcher.",
@@ -487,10 +487,14 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
 	if(romfs)
 	{
-		Handle fsHandle;
+		Handle fsHandle, fileHandle;
+		FS_archive sdmcArchive = (FS_archive){0x00000009, (FS_path){PATH_EMPTY, 1, (u8*)""}};
 		srvGetServiceHandle(&fsHandle, "fs:USER");
 
-		patchFsOpenRom(code_data, code_size, fsHandle, romfs);
+		FSUSER_OpenFileDirectly(&fsHandle, &fileHandle, sdmcArchive, FS_makePath(PATH_CHAR, romfs), FS_OPEN_READ, FS_ATTRIBUTE_NONE);
+
+		// patchFsOpenRom(code_data, code_size, fsHandle, romfs);
+		patchFsOpenRom(code_data, code_size, fileHandle);
 	}
 
 	return 0;

@@ -34,7 +34,12 @@ function_s findFsOpenFileDirectly(u8* code_data, u32 code_size)
 
 function_s findFsControlArchive(u8* code_data, u32 code_size)
 {
-    return findPooledCommandFunction(code_data, code_size, 0x80D0144, NULL);
+    return findPooledCommandFunction(code_data, code_size, 0x080D0144, NULL);
+}
+
+function_s findFsOpenLinkFile(u8* code_data, u32 code_size)
+{
+    return findPooledCommandFunction(code_data, code_size, 0x080C0000, NULL);
 }
 
 function_s findFsHighLevelInitialize(u8* code_data, u32 code_size)
@@ -455,7 +460,7 @@ void patchPathDirectoryInsertFindArchive(u8* code_data, u32 code_size, function_
     code_data32[fsFindArchive.start] = 0xEA000000 | ((thunk - fsFindArchive.start - 2) & 0x00FFFFFF); // b origin+4
 }
 
-void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle, char* path)
+void patchFsOpenRom(u8* code_data, u32 code_size, u32 fileHandle)
 {
     if(!code_data || !code_size)return;
     function_s fsOpenFileDirectly = findFsOpenFileDirectly(code_data, code_size);
@@ -471,18 +476,30 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle, char* path)
 
     memcpy(&code_data32[stub_offset], openfiledirectly_stub_stub, openfiledirectly_stub_stub_size);
     code_data32[stub_offset + 3] = code_data32[fsOpenFileDirectly.start];
-    code_data32[stub_offset + stub_size32 - 2] = fsHandle;
+    code_data32[stub_offset + stub_size32 - 2] = fileHandle;
     code_data32[stub_offset + stub_size32 - 1] = 0x00100000 + (fsOpenFileDirectly.start + 1) * 4;
+
+    // offset
+    u32 tmp1 = 0, tmp2 = 0;
+    FSFILE_Read(fileHandle, &tmp2, 0x0, &tmp1, 0x4);
+    u32 offset = (tmp1 == 0x43465649) ? 0x1000 : 0x0;
+
+    // size
+    u64 size = 0;
+    FSFILE_GetSize(fileHandle, &size);
+    size -= offset;
 
     int i;
     for(i=fatalErr.start+1; i<fatalErr.end; i++)
     {
-        if(code_data32[i] == 0x6E61682f) // "/han"
+        if(code_data32[i] == 0xdeaddad0)
         {
-            strncpy((char*)&code_data32[i], path, 23);
-        }else if(code_data32[i] == 0xdeaddad0)
+            code_data32[i] = offset; // IVFC magic check
+            code_data32[i+1] = 0x0;
+        }else if(code_data32[i] == 0xdeaddad1)
         {
-            code_data32[i] = strlen(path) + 1;
+            // size
+            *(u64*)&code_data32[i] = size;
             break;
         }
     }
@@ -496,6 +513,13 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fsHandle, char* path)
     {
         code_data32[fsSetPriorityForFile.start + 0] = 0xE3A00000; // mov r0, #0
         code_data32[fsSetPriorityForFile.start + 1] = 0xE12FFF1E; // bx lr
+    }
+
+    function_s fsOpenLinkFile = findFsOpenLinkFile(code_data, code_size);
+    if(fsOpenLinkFile.start != fsOpenLinkFile.end)
+    {
+        code_data32[fsOpenLinkFile.start + 0] = 0xE3A03003; // mov r3, #3
+        code_data32[fsOpenLinkFile.start + 1] = 0xEA000000 | ((fatalErr.start + 1 - fsOpenLinkFile.start - 2) & 0x00FFFFFF); // branch
     }
 }
 
@@ -518,6 +542,9 @@ void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle, char* directory
     
     function_s fsControlArchive = findFsControlArchive(code_data, code_size);
     printf("fsControlArchive : %08X - %08X\n", (unsigned int)(fsControlArchive.start * 4 + 0x00100000), (unsigned int)(fsControlArchive.end * 4 + 0x00100000));
+    
+    function_s fsOpenLinkFile = findFsOpenLinkFile(code_data, code_size);
+    printf("fsOpenLinkFile : %08X - %08X\n", (unsigned int)(fsOpenLinkFile.start * 4 + 0x00100000), (unsigned int)(fsOpenLinkFile.end * 4 + 0x00100000));
     
     // function_s fsFindArchive = (function_s){0xA7FF, 0xA830}; // TEMP (MM)
     function_s fsFindArchive = (function_s){0x11183, 0x111B4}; // TEMP (POKEY)
