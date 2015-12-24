@@ -318,7 +318,7 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 				if(sscanf(l, "region : %d", &choice[CHOICE_REGION]) != 1)
 				if(sscanf(l, "language : %d", &choice[CHOICE_LANGUAGE]) != 1);
 				if(sscanf(l, "nim_checkupdate : %d", &choice[CHOICE_NIMUPDATE]) != 1);
-				if(nimversion && sscanf(l, "nimversion : %d", nimversion) != 1);
+				if(nimversion && sscanf(l, "nim_version : %d", nimversion) != 1);
 				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
 				if(sscanf(l, "romfs : %d", &choice[CHOICE_ROMFS]) != 1);
 				if(sscanf(l, "code : %d", &choice[CHOICE_CODE]) != 1);
