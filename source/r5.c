@@ -264,15 +264,12 @@ Result checkRomfs(char* _path)
 	FILE* f = fopen(path, "rb");
 	if(!f)return -2;
 
-	u32 tmp = 0;
-	fread(&tmp, 4, 1, f);
-
 	fclose(f);
 
-	return (tmp == 0x43465649) ? -3 : 0; // IVFC
+	return 0;
 }
 
-Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, char** romfs, char** code, u8* nim)
+Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* clock, char** romfs, char** code, u8* nim, int* nimversion)
 {
 	u8 mediatype = 0;
 	u64 tid = 0;
@@ -307,6 +304,8 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 
 	Result romfsValid = checkRomfs(romfs_path);
 
+	if(nimversion) *nimversion = 0;
+
 	hidScanInput();
 
 	{
@@ -319,6 +318,7 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 				if(sscanf(l, "region : %d", &choice[CHOICE_REGION]) != 1)
 				if(sscanf(l, "language : %d", &choice[CHOICE_LANGUAGE]) != 1);
 				if(sscanf(l, "nim_checkupdate : %d", &choice[CHOICE_NIMUPDATE]) != 1);
+				if(nimversion && sscanf(l, "nimversion : %d", nimversion) != 1);
 				if(sscanf(l, "clock : %d", &choice[CHOICE_CLOCK]) != 1);
 				if(sscanf(l, "romfs : %d", &choice[CHOICE_ROMFS]) != 1);
 				if(sscanf(l, "code : %d", &choice[CHOICE_CODE]) != 1);
@@ -431,10 +431,11 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
     u8 language_code = 2;
     u8 clock = 0;
     u8 nim = 0;
+    int nimversion = -1;
     char* romfs = NULL;
     char* code = NULL;
 
-    Result ret = configureTitle(cfg_path, &region_code, &language_code, &clock, &romfs, &code, &nim);
+    Result ret = configureTitle(cfg_path, &region_code, &language_code, &clock, &romfs, &code, &nim, &nimversion);
 
     if(ret)return ret;
     
@@ -456,6 +457,11 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
     printf("region %X\n", region_code);
     printf("language %X\n", language_code);
+
+    if(nimversion >= 0)
+    {
+    	patchNimTitleVersion(code_data, code_size, nimversion);
+    }
 
     if(region_code != 0xFF)
     {
@@ -483,6 +489,24 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 	if(nim)
 	{
 		patchNimCheckSysupdateAvailableSOAP(code_data, code_size);
+
+		const static char target[] = "%s/samurai/ws/%s/title/%llu/other_purchased?shop_id=1&lang=%s&_t";
+		const static char url[] = "http://smealum.github.io/ninjhax2/samurai.json?%s%s%llu%s";
+
+		int i;
+		int cursor = 0;
+		int l = strlen(target);
+		for(i=0; i<code_size; i++)
+		{
+			if(cursor == l)
+			{
+				strcpy((char*)&code_data[i - l], url);
+				break;
+			}
+
+			if(target[cursor] == code_data[i]) cursor++;
+			else cursor = 0;
+		}
 	}
 
 	if(romfs)
@@ -496,6 +520,16 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 		// patchFsOpenRom(code_data, code_size, fsHandle, romfs);
 		patchFsOpenRom(code_data, code_size, fileHandle);
 	}
+
+	// {
+	// 	Handle fsHandle;
+	// 	FS_archive sdmcArchive = (FS_archive){0x00000009, (FS_path){PATH_EMPTY, 1, (u8*)""}};
+	// 	srvGetServiceHandle(&fsHandle, "fs:USER");
+
+	// 	FSUSER_OpenArchive(&fsHandle, &sdmcArchive);
+
+	// 	patchFsSavegame(code_data, code_size, fsHandle, (u64)sdmcArchive.handleLow | (((u64)sdmcArchive.handleHigh) << 32));
+	// }
 
 	return 0;
 }

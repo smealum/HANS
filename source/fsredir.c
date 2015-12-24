@@ -8,10 +8,6 @@
 #include "darm.h"
 #include "fsredir.h"
 
-#include "path_insert_stub_stub.h"
-#include "findarchive_path_insert_stub_stub.h"
-#include "openfiledirectly_stub_stub.h"
-
 function_s findFsInitialize(u8* code_data, u32 code_size)
 {
     return findPooledCommandFunction(code_data, code_size, 0x08010002, NULL);
@@ -40,6 +36,11 @@ function_s findFsControlArchive(u8* code_data, u32 code_size)
 function_s findFsOpenLinkFile(u8* code_data, u32 code_size)
 {
     return findPooledCommandFunction(code_data, code_size, 0x080C0000, NULL);
+}
+
+function_s findFsOpenFile(u8* code_data, u32 code_size)
+{
+    return findPooledCommandFunction(code_data, code_size, 0x080201C2, NULL);
 }
 
 function_s findFsHighLevelInitialize(u8* code_data, u32 code_size)
@@ -335,13 +336,19 @@ bool findFatalerrCallback(u32* code_data32, u32 code_size32, function_s candidat
     return true;
 }
 
+// TODO : global cache system
+// not so much for efficiency (idgaf), but to avoid patches making stuff unfindable...
+function_s saved_fatalerr = (function_s){0,0};
+
 function_s findFatalerr(u8* code_data, u32 code_size)
 {
     if(!code_data || !code_size)return (function_s){0,0};
+    if(saved_fatalerr.start != saved_fatalerr.end)return saved_fatalerr;
 
     function_s svcConnectToPort = findSvcConnectToPort(code_data, code_size);
 
-    return findFunctionReferenceFunction(code_data, code_size, svcConnectToPort, findFatalerrCallback, NULL);
+    saved_fatalerr = findFunctionReferenceFunction(code_data, code_size, svcConnectToPort, findFatalerrCallback, NULL);
+    return saved_fatalerr;
 }
 
 bool findFsSetPriorityForFileCallback(u32* code_data32, u32 code_size32, function_s candidate, u32 ref)
@@ -482,7 +489,7 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fileHandle)
     // offset
     u32 tmp1 = 0, tmp2 = 0;
     FSFILE_Read(fileHandle, &tmp2, 0x0, &tmp1, 0x4);
-    u32 offset = (tmp1 == 0x43465649) ? 0x1000 : 0x0;
+    u64 offset = (tmp1 == 0x43465649) ? 0x1000 : 0x0; // IVFC magic check
 
     // size
     u64 size = 0;
@@ -494,18 +501,16 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fileHandle)
     {
         if(code_data32[i] == 0xdeaddad0)
         {
-            code_data32[i] = offset; // IVFC magic check
-            code_data32[i+1] = 0x0;
+            *(u64*)&code_data32[i] = offset;
         }else if(code_data32[i] == 0xdeaddad1)
         {
-            // size
             *(u64*)&code_data32[i] = size;
             break;
         }
     }
 
     code_data32[fatalErr.start] = 0xffffffff;
-    code_data32[fsOpenFileDirectly.start] = 0xEA000000 | ((fatalErr.start + 1 - fsOpenFileDirectly.start - 2) & 0x00FFFFFF); // branch
+    code_data32[fsOpenFileDirectly.start] = 0xEA000000 | ((stub_offset - fsOpenFileDirectly.start - 2) & 0x00FFFFFF); // branch
 
     function_s fsSetPriorityForFile = findFsSetPriorityForFile(code_data, code_size);
 
@@ -519,8 +524,32 @@ void patchFsOpenRom(u8* code_data, u32 code_size, u32 fileHandle)
     if(fsOpenLinkFile.start != fsOpenLinkFile.end)
     {
         code_data32[fsOpenLinkFile.start + 0] = 0xE3A03003; // mov r3, #3
-        code_data32[fsOpenLinkFile.start + 1] = 0xEA000000 | ((fatalErr.start + 1 - fsOpenLinkFile.start - 2) & 0x00FFFFFF); // branch
+        code_data32[fsOpenLinkFile.start + 1] = 0xEA000000 | ((stub_offset - (fsOpenLinkFile.start + 1) - 2) & 0x00FFFFFF); // branch
     }
+}
+
+void patchFsSavegame(u8* code_data, u32 code_size, u32 fsHandle, u64 archiveHandle)
+{
+    if(!code_data || !code_size)return;
+    function_s fsOpenFile = findFsOpenFile(code_data, code_size);
+    if(fsOpenFile.start == fsOpenFile.end)return;
+
+    u32* code_data32 = (u32*)code_data;
+    u32 code_size32 = code_size / 4;
+
+    function_s fatalErr = findFatalerr(code_data, code_size);
+
+    u32 stub_offset = fatalErr.start + 1 + STUB_OF_OFFSET;
+    u32 stub_size32 = openfile_stub_stub_size / 4;
+
+    memcpy(&code_data32[stub_offset], openfile_stub_stub, stub_size32 * 4);
+    code_data32[stub_offset + 6] = code_data32[fsOpenFile.start];
+    *(u64*)&code_data32[stub_offset + stub_size32 - 4] = archiveHandle;
+    code_data32[stub_offset + stub_size32 - 2] = fsHandle;
+    code_data32[stub_offset + stub_size32 - 1] = 0x00100000 + (fsOpenFile.start + 1) * 4;
+
+    code_data32[fatalErr.start] = 0xffffffff;
+    code_data32[fsOpenFile.start] = 0xEA000000 | ((stub_offset - fsOpenFile.start - 2) & 0x00FFFFFF); // branch
 }
 
 void patchRedirectFs(u8* code_data, u32 code_size, u32 fsHandle, char* directory)

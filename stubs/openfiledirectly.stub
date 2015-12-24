@@ -28,7 +28,7 @@ openfiledirectly:
 		cmp r2, #cmd_buf_end-cmd_buf
 		bne openfiledirectly_loop
 
-	ldr r0, [pc, #fs_handle-.-8]
+	ldr r0, [pc, #file_handle-.-8]
 	.word 0xef000032
 
     ldr r1, [sp], #4
@@ -49,7 +49,7 @@ cmd_buf:
 cmd_buf_end:
 
 .align 0x4
-fs_handle:
+file_handle:
 	.word 0xdeadbabe
 real_func:
 	.word 0xdeadbabe
