@@ -1,3 +1,4 @@
 # hans
 
-require Darm : https://github.com/jbremer/darm
+requires Darm : https://github.com/jbremer/darm
+and armips
