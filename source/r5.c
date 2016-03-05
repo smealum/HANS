@@ -425,7 +425,7 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 	return 0;
 }
 
-Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
+Result doRegionFive(u8** code_data, u32* code_size, char* cfg_path)
 {
     u8 region_code = 2;
     u8 language_code = 2;
@@ -434,6 +434,8 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
     int nimversion = -1;
     char* romfs = NULL;
     char* code = NULL;
+
+    if(!code_size || !code_data)return -1;
 
     Result ret = configureTitle(cfg_path, &region_code, &language_code, &clock, &romfs, &code, &nim, &nimversion);
 
@@ -450,7 +452,13 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 		FILE* f = fopen(path, "rb");
 		if(!f)return -1;
 
-		fread(code_data, 1, code_size, f);
+		fseek(f, 0, SEEK_END);
+		*code_size = ftell(f);
+		fseek(f, 0, SEEK_SET);
+
+		(*code_data) = linearMemAlign(*code_size, 0x1000);
+
+		fread((*code_data), 1, *code_size, f);
 
 		fclose(f);
 	}
@@ -460,25 +468,25 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
     if(nimversion >= 0)
     {
-    	patchNimTitleVersion(code_data, code_size, nimversion);
+    	patchNimTitleVersion((*code_data), *code_size, nimversion);
     }
 
     if(region_code != 0xFF)
     {
-	    function_s cfgSecureInfoGetRegion = findCfgSecureInfoGetRegion(code_data, code_size);
+	    function_s cfgSecureInfoGetRegion = findCfgSecureInfoGetRegion((*code_data), *code_size);
 
 	    printf("cfgSecureInfoGetRegion : %08X - %08X\n", (unsigned int)(cfgSecureInfoGetRegion.start * 4 + 0x00100000), (unsigned int)(cfgSecureInfoGetRegion.end * 4 + 0x00100000));
 
-	    patchCfgSecureInfoGetRegion(code_data, code_size, cfgSecureInfoGetRegion, region_code);
+	    patchCfgSecureInfoGetRegion((*code_data), *code_size, cfgSecureInfoGetRegion, region_code);
     }
 
     if(language_code != 0xFF)
 	{
-	    function_s cfgCtrGetLanguage = findCfgCtrGetLanguage(code_data, code_size);
+	    function_s cfgCtrGetLanguage = findCfgCtrGetLanguage((*code_data), *code_size);
 	    
 	    printf("cfgCtrGetLanguage : %08X - %08X\n", (unsigned int)(cfgCtrGetLanguage.start * 4 + 0x00100000), (unsigned int)(cfgCtrGetLanguage.end * 4 + 0x00100000));
 
-	    patchCfgCtrGetLanguage(code_data, code_size, cfgCtrGetLanguage, language_code);
+	    patchCfgCtrGetLanguage((*code_data), *code_size, cfgCtrGetLanguage, language_code);
 	}
 
 	if(clock != 0xFF)
@@ -488,7 +496,7 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
 	if(nim)
 	{
-		patchNimCheckSysupdateAvailableSOAP(code_data, code_size);
+		patchNimCheckSysupdateAvailableSOAP((*code_data), *code_size);
 
 		const static char target[] = "%s/samurai/ws/%s/title/%llu/other_purchased?shop_id=1&lang=%s&_t";
 		const static char url[] = "http://smealum.github.io/ninjhax2/samurai.json?%s%s%llu%s";
@@ -496,15 +504,15 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 		int i;
 		int cursor = 0;
 		int l = strlen(target);
-		for(i=0; i<code_size; i++)
+		for(i=0; i<*code_size; i++)
 		{
 			if(cursor == l)
 			{
-				strcpy((char*)&code_data[i - l], url);
+				strcpy((char*)&(*code_data)[i - l], url);
 				break;
 			}
 
-			if(target[cursor] == code_data[i]) cursor++;
+			if(target[cursor] == (*code_data)[i]) cursor++;
 			else cursor = 0;
 		}
 	}
@@ -517,8 +525,8 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
 		FSUSER_OpenFileDirectly(&fsHandle, &fileHandle, sdmcArchive, FS_makePath(PATH_CHAR, romfs), FS_OPEN_READ, FS_ATTRIBUTE_NONE);
 
-		// patchFsOpenRom(code_data, code_size, fsHandle, romfs);
-		patchFsOpenRom(code_data, code_size, fileHandle);
+		// patchFsOpenRom((*code_data), *code_size, fsHandle, romfs);
+		patchFsOpenRom((*code_data), *code_size, fileHandle);
 	}
 
 	// {
@@ -528,7 +536,7 @@ Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path)
 
 	// 	FSUSER_OpenArchive(&fsHandle, &sdmcArchive);
 
-	// 	patchFsSavegame(code_data, code_size, fsHandle, (u64)sdmcArchive.handleLow | (((u64)sdmcArchive.handleHigh) << 32));
+	// 	patchFsSavegame((*code_data), *code_size, fsHandle, (u64)sdmcArchive.handleLow | (((u64)sdmcArchive.handleHigh) << 32));
 	// }
 
 	return 0;

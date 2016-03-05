@@ -5,6 +5,7 @@
 
 #include "decomp.h"
 #include "common.h"
+#include "mmap.h"
 #include "r5.h"
 #include "loader_bin.h"
 
@@ -38,7 +39,7 @@ void buildMap(memorymap_t* mm, u32 size)
 			if(!mm->num) mm->processLinearOffset = section_size;
 			current_offset += section_size;
 			mm->map[mm->num++] = (memorymap_entry_t){0x00100000 + current_offset - section_size, mm->processLinearOffset - current_offset, section_size};
-			printf("%d : %08X - %08X\n", mm->num-1, mm->map[mm->num-1].dst, mm->map[mm->num-1].dst + mm->map[mm->num-1].size);
+			printf("%d : %08X - %08X\n", mm->num-1, (unsigned int)mm->map[mm->num-1].dst, (unsigned int)(mm->map[mm->num-1].dst + mm->map[mm->num-1].size));
 			current_size -= section_size;
 		}
 	}
@@ -126,36 +127,51 @@ Result loadCode()
 	u8* fileBuffer = NULL;
 	u64 fileSize = 0;
 
+	if(!ret)
 	{
 		u32 bytesRead;
 
 		ret = FSFILE_GetSize(fileHandle, &fileSize);
-		if(ret)return ret;
 
 		fileBuffer = malloc(fileSize);
-		if(ret)return ret;
 
 		ret = FSFILE_Read(fileHandle, &bytesRead, 0x0, fileBuffer, fileSize);
-		if(ret)return ret;
+		if(ret)
+		{
+			free(fileBuffer);
+			fileBuffer = NULL;
+		}
 
 		ret = FSFILE_Close(fileHandle);
-		if(ret)return ret;
 
 		printf("loaded code : %08X\n", (unsigned int)fileSize);
 	}
 
-	u32 decompressedSize = lzss_get_decompressed_size(fileBuffer, fileSize);
-	printf("decompressed code size : %08X\n", (unsigned int)decompressedSize);
-	u8* decompressedBuffer = linearMemAlign(decompressedSize, 0x1000);
-	if(!decompressedBuffer)return -1;
+	paramblk->code_data = NULL;
+	paramblk->code_size = 0;
 
-	lzss_decompress(fileBuffer, fileSize, decompressedBuffer, decompressedSize);
+	if(fileBuffer)
+	{
+		u32 decompressedSize = lzss_get_decompressed_size(fileBuffer, fileSize);
+		printf("decompressed code size : %08X\n", (unsigned int)decompressedSize);
+		u8* decompressedBuffer = linearMemAlign(decompressedSize, 0x1000);
+		if(!decompressedBuffer)return -1;
 
-	buildMap(&processMap, decompressedSize);
-	printf("map built : %08X\n", (unsigned int)(FIRM_APPMEMALLOC_LINEAR - processMap.processLinearOffset));
+		lzss_decompress(fileBuffer, fileSize, decompressedBuffer, decompressedSize);
 
-	paramblk->code_data = (u32*)decompressedBuffer;
-	paramblk->code_size = decompressedSize;
+		buildMap(&processMap, decompressedSize);
+		printf("map built : %08X\n", (unsigned int)(FIRM_APPMEMALLOC_LINEAR - processMap.processLinearOffset));
+
+		paramblk->code_data = (u32*)decompressedBuffer;
+		paramblk->code_size = decompressedSize;
+	}
+
+	memorymap_t* _mmap = loadMemoryMapTitle(tid & 0xffffffff, (tid >> 32) & 0xffffffff);
+	if(_mmap)
+	{
+		processMap = *_mmap;
+		free(_mmap);
+	}
 
 	return 0;
 }
@@ -164,7 +180,7 @@ Result patchCode(char* cfg_path)
 {
 	printf("patchin\n");
 
-	Result ret = doRegionFive((u8*)paramblk->code_data, paramblk->code_size, cfg_path);
+	Result ret = doRegionFive((u8**)&paramblk->code_data, &paramblk->code_size, cfg_path);
 
 	printf("ballin\n");
 
@@ -339,7 +355,7 @@ int main(int argc, char **argv)
 			}
 		}
 	}
-	if(configuration_file)printf("configuration_file %s\n", configuration_file);
+	if(configuration_file) printf("configuration_file %s\n", configuration_file);
 
 	printf("what is up\n");
 
@@ -364,7 +380,7 @@ int main(int argc, char **argv)
 	}
 
 	Result ret = patchCode(configuration_file);
-	if(!ret)runLoader();
+	if(!ret) runLoader();
 
 	hidScanInput();
 	if(hidKeysHeld() & KEY_Y)

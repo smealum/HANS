@@ -3,6 +3,6 @@
 
 #include "patch.h"
 
-Result doRegionFive(u8* code_data, u32 code_size, char* cfg_path);
+Result doRegionFive(u8** code_data, u32* code_size, char* cfg_path);
 
 #endif
