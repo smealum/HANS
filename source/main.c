@@ -115,12 +115,12 @@ Result loadCode()
 
 	printf("%08X : %d, %08X, %08X\n", (unsigned int)ret, mediatype, (unsigned int)tid & 0xFFFFFFFF, (unsigned int)(tid >> 32) & 0xFFFFFFFF);
 
-	// // if we supported updates we'd do this
-	// ret = openCode(&fileHandle, tid | 0x0000000E00000000LL, 1);
-	// if(ret) ret = openCode(&fileHandle, tid, mediatype);
+	// if we supported updates we'd do this
+	ret = openCode(&fileHandle, tid | 0x0000000E00000000LL, 1);
+	if(ret) ret = openCode(&fileHandle, tid, mediatype);
 
-	// but right now we don't so too bad
-	ret = openCode(&fileHandle, tid, mediatype);
+	// // but right now we don't so too bad
+	// ret = openCode(&fileHandle, tid, mediatype);
 
 	printf("loading code : %08X\n", (unsigned int)ret);
 
