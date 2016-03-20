@@ -1,0 +1,32 @@
+.nds
+
+.create "openarchive.bin", 0x0
+
+.loadtable "../unicode.tbl"
+
+.arm
+openarchive:
+	cmp r2, #3
+	beq save_handler
+	
+	ldr r12, [pc, #real_func-.-8]
+	nop
+	bx r12
+
+	save_handler:
+	; if it's the savegame archive then we want to just return the sd archive handle
+	ldrd r2, [pc, #archive_handle-.-8]
+	strd r2, [r1]
+	mov r0, #0
+	bx lr
+
+.pool
+
+.align 0x4
+archive_handle:
+	.word 0xdeadbabe
+	.word 0xdeadbabe
+real_func:
+	.word 0xdeadbabe
+
+.Close
