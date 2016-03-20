@@ -304,7 +304,7 @@ Result configureTitle(char* cfg_path, u8* region_code, u8* language_code, u8* cl
 
 	Result romfsValid = checkRomfs(romfs_path);
 
-	if(nimversion) *nimversion = 0;
+	if(nimversion) *nimversion = -1;
 
 	hidScanInput();
 
