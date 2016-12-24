@@ -22,7 +22,7 @@ typedef struct
 {
 	int num;
 	u32 processLinearOffset;
-	memorymap_entry_t map[8];
+	memorymap_entry_t map[32];
 }memorymap_t;
 
 typedef struct

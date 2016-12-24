@@ -13,6 +13,8 @@ u32 _firm_appmemalloc = 0x04000000;
 
 paramblk_t* paramblk = NULL;
 
+u32 (*_doExtendedCommand)(u32 cmd_id, void* data, u32 datalen) = (void*)0x00100018;
+
 Result gspwn(void* dst, void* src, u32 size)
 {
 	return GX_SetTextureCopy(NULL, src, 0xFFFFFFFF, dst, 0xFFFFFFFF, size, 0x8);
@@ -20,7 +22,30 @@ Result gspwn(void* dst, void* src, u32 size)
 
 void buildMap(memorymap_t* mm, u32 size)
 {
-	if(!mm)return;
+	if(!mm) return;
+
+	printf("checking\n");
+
+	u32 val = _doExtendedCommand(0, NULL, 0);
+
+	printf("checked %08X\n", val);
+
+	if(val == 0x0badc0de)
+	{
+		mm->num = _doExtendedCommand(1, NULL, 0);
+		mm->processLinearOffset = FIRM_APPMEMALLOC_LINEAR - _doExtendedCommand(2, NULL, 0);
+		memcpy(mm->map, _doExtendedCommand(3, NULL, 0), sizeof(memorymap_entry_t) * mm->num);
+
+		printf("map %08X %08X %08X, %08X, %08X\n", mm->num, mm->processLinearOffset, (u32)_doExtendedCommand(3, NULL, 0), FIRM_APPMEMALLOC_LINEAR, _doExtendedCommand(2, NULL, 0));
+	
+		// while(1);
+
+		return;
+	}
+
+	printf("checked %08X\n", val);
+
+	// while(1);
 
 	// init
 	mm->num = 0;
@@ -164,6 +189,8 @@ Result loadCode()
 
 		paramblk->code_data = (u32*)decompressedBuffer;
 		paramblk->code_size = decompressedSize;
+
+		printf("code loaded : %08X %08X %08X\n", (unsigned int)(paramblk), (unsigned int)(paramblk->code_data), (unsigned int)(paramblk->code_size));
 	}
 
 	memorymap_t* _mmap = loadMemoryMapTitle(tid & 0xffffffff, (tid >> 32) & 0xffffffff);
@@ -315,6 +342,12 @@ PrintConsole topScreen, bottomScreen;
 
 int main(int argc, char **argv)
 {
+	{
+		u8 n3ds = 0;
+		APT_CheckNew3DS(NULL, &n3ds);
+		_firm_appmemalloc = n3ds ? 0x07c00000 : 0x04000000;
+	}
+
 	gfxInitDefault();
 
 	consoleInit(GFX_TOP, &topScreen);
@@ -363,34 +396,8 @@ int main(int argc, char **argv)
 	srvGetServiceHandle(&paramblk->nssHandle, "ns:s");
 	loadCode();
 
-	hidScanInput();
-	if(hidKeysHeld() & KEY_Y)
-	{
-		while(true)
-		{
-			hidScanInput();
-			if(hidKeysDown() & KEY_START)break;
-		}
-	}
-
-	{
-		u8 n3ds = 0;
-		APT_CheckNew3DS(NULL, &n3ds);
-		_firm_appmemalloc = n3ds ? 0x07c00000 : 0x04000000;
-	}
-
 	Result ret = patchCode(configuration_file);
 	if(!ret) runLoader();
-
-	hidScanInput();
-	if(hidKeysHeld() & KEY_Y)
-	{
-		while(true)
-		{
-			hidScanInput();
-			if(hidKeysDown() & KEY_START)break;
-		}
-	}
 
 	if(configuration_file) free(configuration_file);
 

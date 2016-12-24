@@ -323,6 +323,7 @@ void _main(paramblk_t* p)
 	print_str("_firm_appmemalloc "); print_hex((u32)_firm_appmemalloc); print_str("\n");
 	print_str("code address "); print_hex((u32)p->code_data); print_str("\n");
 	print_str("code size    "); print_hex(p->code_size); print_str("\n");
+	print_str("paramblk     "); print_hex((u32)p); print_str("\n");
 
 	setupStub((u8*)p->code_data);
 
